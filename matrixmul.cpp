@@ -5,8 +5,7 @@
 #include <getopt.h>
 
 #include "densematgen.h"
-
-typedef void* sparse_type;
+#include "sparse.h"
 
 int main(int argc, char * argv[])
 {
@@ -24,7 +23,7 @@ int main(int argc, char * argv[])
   double ge_element = 0;
   int count_ge = 0;
 
-  sparse_type sparse = NULL;
+  Sparse* sparse = NULL;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
@@ -38,9 +37,22 @@ int main(int argc, char * argv[])
     case 'i': use_inner = 1;
       break;
     case 'f': if ((mpi_rank) == 0) 
-      { 
+      {
         // FIXME: Process 0 should read the CSR sparse matrix here
-        sparse = NULL;
+        int row_no, col_no, nnz, nnz_max;
+        scanf("%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
+        assert(col_no == row_no);
+
+        Sparse full_sparse(0, 0, row_no, col_no, nnz);
+        for(int i=0; i<nnz; ++i){
+          scanf("%lf", &full_sparse.A[i]);
+        }
+        for(int i=0; i<(row_no+1); ++i){
+          scanf("%d", &full_sparse.IA[i]);
+        }
+        for(int i=0; i<nnz; ++i){
+          scanf("%d", &full_sparse.JA[i]);
+        }
       }
       break;
     case 'c': repl_fact = atoi(optarg);
