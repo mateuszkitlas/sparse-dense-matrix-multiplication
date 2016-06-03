@@ -22,6 +22,8 @@ class Sparse {
       int row_no,
       int col_no,
       int nnz_max);
+  Sparse** split(int rows, cols);
+  inline int r(){ return *this->first_row
 
 };
 

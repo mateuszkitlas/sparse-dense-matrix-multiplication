@@ -37,3 +37,39 @@ Sparse::Sparse(
   *this->first_col = first_col;
 }
 
+//divides the most equally
+inline int part_size(int a, int b, int i){ return a / b + (a % b == i + 1) }
+
+int Sparse::nnz_max_by_col(parts){
+  int nnzs = new int[parts];
+  int m = 0;
+  for(int i=0; i<parts; ++i)
+    nnzs[i]=0;
+  for(int i=0; i<*this->nnz; ++i)
+    m = max(m, ++nnzs[this->JA[i]]);
+  return m;
+}
+int Sparse::nnz_max_by_row(parts){
+  int m = 0;
+  int last_row = 0; //excluded
+  int this_row = 0; //included
+  for(int p=0; p<parts; ++p){
+    this_row += part_size(*this->row_no, parts, p);
+    m = max(m, IA[this_row]-IA[last_row]);
+    last_row = this_row;
+  }
+  return m;
+}
+
+Sparse* Sparse::split(bool by_row, int c, int p){
+  //row_no == col_no
+  int row_no = *this->row_no;
+  int part_count = p/c + (p%c > 0);
+  Sparse* result = new Sparse*[row_no];
+  for(int row; row<row_no; ++row){
+    result[row]
+    first_row = part_size(row_no, rows, row);
+  }
+  return result;
+}
+
