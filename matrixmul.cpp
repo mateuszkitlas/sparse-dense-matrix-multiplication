@@ -55,9 +55,9 @@ int main(int argc, char * argv[])
         }
 
         int block_count = Sparse::block_count(row_no-3, 2);
-        Sparse* mini_sparses = full_sparse.split(true, block_count);
-        for(int block=0; block<block_count; ++block)
-          delete mini_sparses[i];
+        Sparse** mini_sparses = full_sparse.split(true, block_count);
+        for(int block_no=0; block_no<block_count; ++block_no)
+          delete mini_sparses[block_no];
         delete mini_sparses;
       }
       break;

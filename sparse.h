@@ -7,12 +7,18 @@ using namespace std;
 
 class Sparse {
   public:
+
+  static Sparse& create(
+      int first_row,
+      int first_col,
+      int row_no,
+      int col_no,
+      int nnz_max);
+
   void* csr;
-  int *first_row, *first_col, *row_no, *col_no, *nnz, *IA, *JA;
+  int *IA, *JA;
   double *A;
-
-  int iterA, iterIA;
-
+  int &first_row, &first_col, &row_no, &col_no, &nnz;
 
   ~Sparse();
   static void* csr_alloc(
@@ -24,7 +30,13 @@ class Sparse {
       int row_no,
       int col_no,
       int nnz_max);
-  Sparse* split(int rows, cols);
+  Sparse** split(bool by_col, int block_count);
+
+
+  static int block_count(int p, int c);
+
+
+  int iterA, iterIA;
   void it_begin(){
     iterA = 0;
     iterIA = 0;
@@ -39,6 +51,23 @@ class Sparse {
   bool next(){ ++iterA; return !end(); }
   bool end(){ return iterA == nnz; }
 
+
+  void insert(double v, int g_col, int g_row){ //global row / col - this is child matrix
+    int last_row = it_row();
+    int new_row = g_row - first_row;
+    if(last_row == new_row){
+      ++IA[iterIA];
+    } else {
+      IA[iterIA + 1] = IA[iterIA] + 1;
+      iterIA++;
+    }
+    iterA++;
+
+    A[iterA] = v;
+    JA[iterA] = g_col - first_col;
+
+    nnz()++;
+  }
 
 };
 
