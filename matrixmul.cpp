@@ -53,6 +53,12 @@ int main(int argc, char * argv[])
         for(int i=0; i<nnz; ++i){
           scanf("%d", &full_sparse.JA[i]);
         }
+
+        int block_count = Sparse::block_count(row_no-3, 2);
+        Sparse* mini_sparses = full_sparse.split(true, block_count);
+        for(int block=0; block<block_count; ++block)
+          delete mini_sparses[i];
+        delete mini_sparses;
       }
       break;
     case 'c': repl_fact = atoi(optarg);
