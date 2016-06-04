@@ -41,6 +41,10 @@ Sparse* Sparse::create(
   sp->row_no_max = row_no_max;
   sp->nnz_max = nnz_max;
 
+  assert(sp->row_no == row_no);
+  assert(sp->nnz == nnz);
+
+
   return sp;
 }
 
@@ -55,6 +59,7 @@ Sparse::Sparse(void* csr)
     , JA( ((int*)csr) + 5 + row_no + 1 )
     , A( (double*)(((int*)csr) + 5 + row_no + 1 + nnz) )
   {
+  assert(csr == this->csr);
   it_begin();
   row_no_max = -1;
   nnz_max = -1;
