@@ -8,35 +8,19 @@ using namespace std;
 class Sparse {
   public:
 
-  static Sparse& create(
-      int first_row,
-      int first_col,
-      int row_no,
-      int col_no,
-      int nnz_max);
-
   void* csr;
+  int &first_row, &first_col, &row_no, &col_no, &nnz;
   int *IA, *JA;
   double *A;
-  int &first_row, &first_col, &row_no, &col_no, &nnz;
 
-  ~Sparse();
+  static size_t csr_alloc_size(
+      int row_no_max,
+      int nnz_max);
   static void* csr_alloc(
       int row_no_max,
       int nnz_max);
-  Sparse(
-      int first_row,
-      int first_col,
-      int row_no,
-      int col_no,
-      int nnz_max);
   Sparse** split(bool by_col, int block_count);
 
-
-  static int block_count(int p, int c);
-
-
-  int iterA, iterIA;
   void it_begin(){
     iterA = 0;
     iterIA = 0;
@@ -66,9 +50,24 @@ class Sparse {
     A[iterA] = v;
     JA[iterA] = g_col - first_col;
 
-    nnz()++;
+    nnz++;
   }
 
+  static Sparse* create(
+      int row_no_max,
+      int nnz_max,
+      int first_row,
+      int first_col,
+      int row_no,
+      int col_no,
+      int nnz);
+  Sparse(void* csr);
+  void free_csr();
+  int side(); //row_no; asserts row_no == col_no
+
+  private:
+  int iterA, iterIA;
+  int nnz_max, row_no_max;
 };
 
 #endif

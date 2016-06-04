@@ -43,21 +43,25 @@ int main(int argc, char * argv[])
         scanf("%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
         assert(col_no == row_no);
 
-        Sparse full_sparse(0, 0, row_no, col_no, nnz);
+        Sparse *full_sparse = Sparse::create(row_no, nnz, 0, 0, row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i){
-          scanf("%lf", &full_sparse.A[i]);
+          scanf("%lf", &full_sparse->A[i]);
         }
         for(int i=0; i<(row_no+1); ++i){
-          scanf("%d", &full_sparse.IA[i]);
+          scanf("%d", &full_sparse->IA[i]);
         }
         for(int i=0; i<nnz; ++i){
-          scanf("%d", &full_sparse.JA[i]);
+          scanf("%d", &full_sparse->JA[i]);
         }
 
-        int block_count = Sparse::block_count(row_no-3, 2);
-        Sparse** mini_sparses = full_sparse.split(true, block_count);
-        for(int block_no=0; block_no<block_count; ++block_no)
+        int block_count = num_processes;
+        Sparse** mini_sparses = full_sparse->split(true, block_count);
+        full_sparse->free_csr();
+        delete full_sparse;
+        for(int block_no=0; block_no<block_count; ++block_no){
+          mini_sparses[block_no]->free_csr();
           delete mini_sparses[block_no];
+        }
         delete mini_sparses;
       }
       break;
