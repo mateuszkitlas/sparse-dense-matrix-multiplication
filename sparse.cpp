@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#ifdef DEBUG
+#define debug printf("debug %s: %s, line %d\n", __FILE__, __FUNCTION__, __LINE__)
+#else
+#define debug ;
+#endif
+
+
 size_t Sparse::csr_alloc_size(
       int row_no_max,
       int nnz_max){//per row

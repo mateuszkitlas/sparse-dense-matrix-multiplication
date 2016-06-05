@@ -1,6 +1,6 @@
 CXX     = mpic++
-CXXFLAGS= -Wall -c -O3
-LDFLAGS = -Wall -O3
+CXXFLAGS= -Wall -c -O3 ${ARGS}
+LDFLAGS = -Wall -O3 ${ARGS}
 ALL     = matrixmul
 
 HEADERS = metgen.h sparse.h

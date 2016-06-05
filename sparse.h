@@ -1,9 +1,16 @@
 #ifndef SPARSE_H
 #define SPARSE_H
 
-#include <vector>
+#include <stdio.h>
 
-using namespace std;
+#ifdef DEBUG
+#define debug_s(arg) { printf("debug %s: %s, line %d\n", __FILE__, __FUNCTION__, __LINE__); printf("%s = %s\n", #arg, arg); }
+#define debug_d(arg) { printf("debug %s: %s, line %d\n", __FILE__, __FUNCTION__, __LINE__); printf("%s = %d\n", #arg, arg); }
+#else
+#define debug_s(arg) {;};
+#define debug_d(arg) {;};
+#endif
+
 
 class Sparse {
   public:

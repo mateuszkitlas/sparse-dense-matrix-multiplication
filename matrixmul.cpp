@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
 #include <assert.h>
@@ -25,9 +24,11 @@ int main(int argc, char * argv[])
 
   Sparse* sparse = NULL;
 
+#ifndef DONT_USE_MPI
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+#endif
 
 
   while ((option = getopt(argc, argv, "vis:f:c:e:g:")) != -1) {
@@ -36,26 +37,30 @@ int main(int argc, char * argv[])
       break;
     case 'i': use_inner = 1;
       break;
-    case 'f': if ((mpi_rank) == 0) 
+    case 'f': if ((mpi_rank) == 0)
       {
-        // FIXME: Process 0 should read the CSR sparse matrix here
+        debug_s(optarg);
+        FILE *file_sparse = fopen(optarg, "r");
         int row_no, col_no, nnz, nnz_max;
-        scanf("%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
+        fscanf(file_sparse, "%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
+        debug_d(row_no);
         assert(col_no == row_no);
 
         Sparse *full_sparse = Sparse::create(row_no, nnz, 0, 0, row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i){
-          scanf("%lf", &full_sparse->A[i]);
+          fscanf(file_sparse, "%lf", &full_sparse->A[i]);
         }
         for(int i=0; i<(row_no+1); ++i){
-          scanf("%d", &full_sparse->IA[i]);
+          fscanf(file_sparse, "%d", &full_sparse->IA[i]);
         }
         for(int i=0; i<nnz; ++i){
-          scanf("%d", &full_sparse->JA[i]);
+          fscanf(file_sparse, "%d", &full_sparse->JA[i]);
         }
 
+        debug_d(nnz);
         int block_count = num_processes;
         Sparse** mini_sparses = full_sparse->split(true, block_count);
+        debug_s("done split");
         full_sparse->free_csr();
         delete full_sparse;
         for(int block_no=0; block_no<block_count; ++block_no){
