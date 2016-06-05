@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <cstdio>
+#include <mpi.h>
 
 #ifdef DEBUG
 #define debug_s(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%s \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
@@ -30,7 +31,7 @@ class Sparse {
       int nnz_max);
   Sparse** split(bool by_col, int block_count);
 
-  void it_begin(){
+  void begin(){
     iterA = 0;
     iterIA = 0;
   }
@@ -61,10 +62,12 @@ class Sparse {
     iterA++;
 
 
-    nnz++;
     debug_s("inserted");
   }
 
+  size_t csr_size(){
+    return sizeof(int)*(5 + row_no + 1 + nnz) + sizeof(double)*(nnz);
+  }
   static Sparse* create(
       int row_no_max,
       int nnz_max,
@@ -76,6 +79,20 @@ class Sparse {
   Sparse(void* csr, int row_no_max, int nnz_max);
   void free_csr();
   int side(); //row_no; asserts row_no == col_no
+
+
+
+  MPI_Request send_req, recv_req;
+  void send(int rank){
+    send_req = MPI_Isend(csr, csr_size, MPI_BYTE, rank, 1410, MPI_COMM_WORLD);
+  }
+  MPI_Request Sparse::recv(int rank, void* csr, int row_no_max, int nnz_max){
+    MPI_Request recv_req = MPI_Irecv(
+        csr,
+        csr_alloc_size(row_no_max, nnz_max),
+        MPI_BYTE,
+        rank, 1410, MPI_COMM_WORLD);
+  }
 
   private:
   int iterA, iterIA;

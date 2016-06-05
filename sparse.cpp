@@ -67,12 +67,12 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
     , nnz(       *( ((int*)csr) + 4 ) )
   {
   assert(csr == this->csr);
-  it_begin();
   this->row_no_max = row_no_max;
   this->nnz_max = nnz_max;
   IA = ((int*)csr) + 5;
   JA = IA + row_no + 1;
-  A = (double*)(JA + (nnz==0 ? nnz_max : nnz));
+  A = (double*)(JA + nnz);
+  begin();
 }
 
 //divides the most equally
@@ -119,8 +119,17 @@ inline int which_block(int matrix_size, int block_count, int matrix_i){
 Sparse** Sparse::split(bool by_col, int block_count){ //by_col == true -> split column as in "colmn A alg"
   debug_s("start sparse");
   Sparse** children = new Sparse*[block_count];
+  int* children_nnz = new int*[block_count];
+  int child_nnz_max = 0;
+
+  for(begin(); !end(); next()){
+    int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
+    children_nnz[block_no]++;
+  }
+  for(int block_no=0; block_no<block_count; ++block_no)
+    child_nnz_max = max(child_nnz_max, children_nnz[block_no]);
+
   //TODO tutaj chybba może być min(max_block_size, nnz_max)
-  int child_nnz_max = by_col ? max_block_size(side(), block_count) : nnz_max;
   int child_row_no_max = by_col ? side() : max_block_size(side(), block_count);
   int first_incl = 0; //first col/row in block
   int this_block_size;
@@ -141,7 +150,7 @@ Sparse** Sparse::split(bool by_col, int block_count){ //by_col == true -> split 
       by_col ? first_incl : 0, //first col
       by_col ? side() : this_block_size, //row_no
       by_col ? this_block_size : side(), //col_no
-      0 //nnz - will be increased while partition
+      children_nnz[block_no] //nnz
     );
 
     first_incl += this_block_size;
