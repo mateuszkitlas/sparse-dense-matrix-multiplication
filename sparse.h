@@ -2,10 +2,11 @@
 #define SPARSE_H
 
 #include <stdio.h>
+#include <cstdio>
 
 #ifdef DEBUG
-#define debug_s(arg) { printf("debug %s: %s, line %d\n", __FILE__, __FUNCTION__, __LINE__); printf("%s = %s\n", #arg, arg); }
-#define debug_d(arg) { printf("debug %s: %s, line %d\n", __FILE__, __FUNCTION__, __LINE__); printf("%s = %d\n", #arg, arg); }
+#define debug_s(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%s \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
+#define debug_d(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%d \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
 #else
 #define debug_s(arg) {;};
 #define debug_d(arg) {;};
@@ -68,7 +69,7 @@ class Sparse {
       int row_no,
       int col_no,
       int nnz);
-  Sparse(void* csr);
+  Sparse(void* csr, int row_no_max, int nnz_max);
   void free_csr();
   int side(); //row_no; asserts row_no == col_no
 

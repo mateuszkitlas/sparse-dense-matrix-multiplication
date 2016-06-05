@@ -58,7 +58,11 @@ int main(int argc, char * argv[])
         }
 
         debug_d(nnz);
+#ifdef DONT_USE_MPI
+        int block_count = row_no / 3 + 1;
+#else
         int block_count = num_processes;
+#endif
         Sparse** mini_sparses = full_sparse->split(true, block_count);
         debug_s("done split");
         full_sparse->free_csr();
