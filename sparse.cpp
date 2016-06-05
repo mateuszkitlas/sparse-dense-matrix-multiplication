@@ -40,6 +40,11 @@ Sparse* Sparse::create(
 
   sp->row_no_max = row_no_max;
   sp->nnz_max = nnz_max;
+  sp->IA[0]=0;
+  sp->IA[1]=0;
+  sp->JA[0]=0;
+  sp->JA[1]=0;
+  sp->A[0]=0;
 
   assert(sp->first_row == first_row);
   assert(sp->first_col == first_col);
@@ -145,6 +150,7 @@ Sparse** Sparse::split(bool by_col, int block_count){ //by_col == true -> split 
   debug_s("partition data");
   while(!this->end()){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
+    debug_d(block_no);
     children[block_no]->insert(it_val(), it_col(), it_row());
     next();
   }
@@ -155,4 +161,15 @@ void Sparse::free_csr(){ free(csr); }
 int Sparse::side(){
   assert(row_no == col_no);
   return col_no;
+}
+
+void Sparse::print(){
+#ifdef DEBUG
+  printf("\
+    first_row = %d\n\
+    first_col = %d\n\
+    row_no = %d\n\
+    col_no = %d\n\
+    nnz = %d\n\n", first_row, first_col, row_no, col_no, nnz);
+#endif
 }

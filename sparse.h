@@ -15,6 +15,7 @@
 
 class Sparse {
   public:
+  void print();
 
   void* csr;
   int &first_row, &first_col, &row_no, &col_no, &nnz;
@@ -40,11 +41,15 @@ class Sparse {
       ++iterIA;
     return iterIA-1;
   }
-  bool next(){ ++iterA; return !end(); }
+  void next(){ ++iterA; }
   bool end(){ return iterA == nnz; }
 
 
   void insert(double v, int g_col, int g_row){ //global row / col - this is child matrix
+    debug_s("inserting");
+    JA[iterA+1] = g_col - first_col;
+    A[iterA+1] = v;
+
     int last_row = it_row();
     int new_row = g_row - first_row;
     if(last_row == new_row){
@@ -55,10 +60,9 @@ class Sparse {
     }
     iterA++;
 
-    A[iterA] = v;
-    JA[iterA] = g_col - first_col;
 
     nnz++;
+    debug_s("inserted");
   }
 
   static Sparse* create(

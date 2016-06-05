@@ -65,9 +65,11 @@ int main(int argc, char * argv[])
 #endif
         Sparse** mini_sparses = full_sparse->split(true, block_count);
         debug_s("done split");
+        full_sparse->print();
         full_sparse->free_csr();
         delete full_sparse;
         for(int block_no=0; block_no<block_count; ++block_no){
+          mini_sparses[block_no]->print();
           mini_sparses[block_no]->free_csr();
           delete mini_sparses[block_no];
         }
