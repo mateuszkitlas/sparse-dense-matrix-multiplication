@@ -13,23 +13,26 @@ int main(int argc, char * argv[])
   int use_inner = 0;
   int gen_seed = -1;
   int repl_fact = 1;
+  int &c = repl_fact;
 
   int option = -1;
 
   double comm_start = 0, comm_end = 0, comp_start = 0, comp_end = 0;
-  int num_processes = 1;
   int exponent = 1;
   double ge_element = 0;
   int count_ge = 0;
 
-  Sparse* sparse = NULL;
+  Sparse** sparses = NULL;
+  Sparse* my_sparse = NULL;
+  Dense* dense_b = NULL;
+  Dense* dense_c = NULL;
   FullSparse* full_sparse = NULL; //only for coordinator
   bool by_col = true; //by_col == true -> split column as in "colmn A alg"
 
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-  debug_d(mpi_rank);
+  assert(mpi_rank == mpi_no(0));
 
 
   while ((option = getopt(argc, argv, "vis:f:c:e:g:")) != -1) {
@@ -104,7 +107,7 @@ int main(int argc, char * argv[])
     full_sparse->free_csr();
     delete full_sparse;
 
-    sparse = mini_sparses[0];
+    my_sparse = mini_sparses[0];
     //sparse->print();
     Sparse *sp;
     for(int block_no=1; block_no<block_count; ++block_no){
@@ -128,9 +131,21 @@ int main(int argc, char * argv[])
     MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
     MPI_Wait(&mpi_meta_init_req);
     debug("got broadcast from coordinator");
-    sparse = Sparse::mpi_create(split_row_no_max, split_nnz_max);
-    sparse->recv(0, mpi_rank);
-    sparse->recv_wait();
+    my_sparse = Sparse::mpi_create(split_row_no_max, split_nnz_max);
+    my_sparse->recv(0, mpi_no(0));
+  }
+
+
+  sparses = new Sparse*[c];
+  sparses[0] = my_sparse;
+  for(int ci = 1; ci<c; ci++){
+    sparses[ci] = Sparse::mpi_create(split_row_no_max, split_nnz_max);
+    sparses[ci]->recv( mpi_no(-ci), mpi_no(-ci) );
+    my_sparse->send( mpi_no(ci) );
+  }
+  for(int ci = 0; ci<c; ci++){
+    sparses[ci]->recv_wait();
+    sparses[ci]->send_wait();
   }
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
@@ -146,9 +161,10 @@ int main(int argc, char * argv[])
   //------------------------
   //---  free A
   //------------------------
-  sparse->print();
-  sparse->free_csr();
-  delete sparse;
+  for(int ci = 0; ci<c; ci++)
+    sparses[ci]->free_csr();
+  //my_sparse->print();
+  delete sparses;
 
   if (show_results) 
   {

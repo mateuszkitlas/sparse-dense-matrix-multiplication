@@ -28,5 +28,8 @@ extern int mpi_meta_init_size;
 extern int &split_row_no_max;
 extern int &split_nnz_max;
 extern int mpi_rank;
+extern int num_processes;
+
+int mpi_no(int);
 
 #endif
