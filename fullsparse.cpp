@@ -23,7 +23,7 @@ inline int which_block(int matrix_size, int block_count, int matrix_i){
   if(i2 < 0)
     return matrix_i / max_block_size_;
   else
-    return (bigger_blocks_count - 1) + i2 / min_block_size_;
+    return bigger_blocks_count + i2 / min_block_size_;
 }
 
 void FullSparse::init_split(bool by_col_, int block_count_){
@@ -86,8 +86,9 @@ Sparse** FullSparse::split(){
   SPFOR(this){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
     sp = children[block_no];
-    debug_p(it_row(), it_col(), it_val());
-    debug_d(block_no);
+    if(block_no == 1)
+      debug_p(it_row(), it_col(), it_val());
+    //debug_d(block_no);
     sp->insert(it_val(), it_col(), it_row());
 
     //assert(sp->it_val() == it_val());
@@ -128,7 +129,7 @@ FullSparse* FullSparse::create(
   assert(sp->col_no == col_no);
   assert(sp->nnz == nnz);
   assert(sp->IA < sp->JA);
-  assert((void*)sp->JA < (void*)sp->A);
+  assert((void*)sp->JA <= (void*)sp->A);
 
 
   return sp;

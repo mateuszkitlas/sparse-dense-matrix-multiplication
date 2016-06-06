@@ -146,8 +146,8 @@ int Sparse::it_row(){
 }
 void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this is child matrix
   //debug_s("inserting");
-  JA[iterA+1] = g_col - first_col;
-  A[iterA+1] = v;
+  JA[iterA] = g_col - first_col;
+  A[iterA] = v;
 
   int last_row = iterIA-1;
   //debug_d(last_row);

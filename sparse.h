@@ -97,6 +97,7 @@ class Sparse {
   int iterA, iterIA;
   protected:
   int nnz_max, row_no_max;
+
 };
 
 #endif
