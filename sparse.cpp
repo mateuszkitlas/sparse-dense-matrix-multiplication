@@ -3,17 +3,24 @@
 #include <assert.h>
 #include "common.h"
 
+void Sparse::update_refs(){
+  IA = ((int*)csr) + 5;
+  JA = IA + row_no + 1;
+  A = (double*)(JA + nnz + 1);
+}
+size_t Sparse::csr_size(){
+  return sizeof(int)*(5 + (row_no + 1) + (nnz + 1)) + sizeof(double)*(nnz);
+}
 size_t Sparse::csr_alloc_size(
       int row_no_max,
       int nnz_max){//per row
   //meta - first_row, first_col, row_no, col_no, nnz - int[5]
-  //IA - int[row_no_max+1]
-  //JA - int[matrix_size]
+  //IA - int[row_no_max + 1]
+  //JA - int[matrix_size + 1]
   //A - double[matrix_size]
-  int matrix_size = nnz_max * row_no_max;
   return
-      sizeof(int)*( 5 + row_no_max + 1 + matrix_size ) +
-      sizeof(double)*( matrix_size );
+      sizeof(int)*( 5 + (row_no_max + 1) + (nnz_max + 1) )+
+      sizeof(double)*( nnz_max );
 }
 void* Sparse::csr_alloc(
       int row_no_max,
@@ -52,7 +59,9 @@ Sparse* Sparse::create(
   assert(sp->row_no == row_no);
   assert(sp->col_no == col_no);
   assert(sp->nnz == nnz);
+  assert(&sp->nnz + 1 == sp->IA);
   assert(sp->IA < sp->JA);
+  assert((void*)sp->JA <= (void*)sp->A);
 
   return sp;
 }
@@ -114,7 +123,7 @@ mpi_rank, block_no,
     nnz-1, A[nnz-1]
     );
   printf("JA: ");
-  for(int i=0; i<nnz; ++i)
+  for(int i=0; i<=nnz; ++i)
     printf("%d ", JA[i]);
   printf("\n");
   printf("IA: ");
@@ -123,6 +132,11 @@ mpi_rank, block_no,
   printf("\n");
   printA();
 #endif
+}
+
+void Sparse::begin(){
+  iterA = 0;
+  iterIA = 0;
 }
 
 int Sparse::it_row(){
@@ -135,7 +149,8 @@ void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this i
   JA[iterA+1] = g_col - first_col;
   A[iterA+1] = v;
 
-  int last_row = it_row();
+  int last_row = iterIA-1;
+  //debug_d(last_row);
   int new_row = g_row - first_row;
   if(last_row == new_row){
     ++IA[iterIA];

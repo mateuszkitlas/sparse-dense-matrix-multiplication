@@ -27,10 +27,8 @@ class Sparse {
       int row_no_max,
       int nnz_max);
 
-  void begin(){
-    iterA = 0;
-    iterIA = 0;
-  }
+  int in_row;
+  void begin();
   double it_val(){ return A[iterA]; }
   int it_col(){ return JA[iterA]; }
   int it_row();
@@ -40,9 +38,7 @@ class Sparse {
 
   void insert(double v, int g_col, int g_row);
 
-  size_t csr_size(){
-    return sizeof(int)*(5 + row_no + 1 + nnz) + sizeof(double)*(nnz);
-  }
+  size_t csr_size();
   static Sparse* mpi_create(int row_no_max, int nnz_max){
     return create(
         row_no_max,
@@ -93,11 +89,7 @@ class Sparse {
   }
   //------------------------
 
-  void update_refs(){
-    IA = ((int*)csr) + 5;
-    JA = IA + row_no + 1;
-    A = (double*)(JA + nnz);
-  }
+  void update_refs();
 
   int block_no;
 

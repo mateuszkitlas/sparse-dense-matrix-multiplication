@@ -6,20 +6,24 @@
 
 //divides the most equally
 inline int block_size(int matrix_size, int block_count, int block_no){
-  return matrix_size / block_count + (matrix_size % block_count == block_no + 1);
+  return matrix_size / block_count + ((matrix_size % block_count) >= (block_no + 1) );
 }
 
 inline int max_block_size(int matrix_size, int block_count){
   return block_size(matrix_size, block_count, 0);
 }
+inline int min_block_size(int matrix_size, int block_count){
+  return block_size(matrix_size, block_count, block_count -1);
+}
 inline int which_block(int matrix_size, int block_count, int matrix_i){
   int bigger_blocks_count = matrix_size % block_count;
-  int block_size = matrix_size / block_count; //+1 in first bigger_blocks_count blocks
-  int i2 = matrix_i - (block_size + 1) * bigger_blocks_count;
+  int max_block_size_ = max_block_size(matrix_size, block_count);
+  int min_block_size_ = min_block_size(matrix_size, block_count);
+  int i2 = matrix_i - max_block_size_ * bigger_blocks_count;
   if(i2 < 0)
-    return matrix_i / (block_size + 1);
+    return matrix_i / max_block_size_;
   else
-    return (bigger_blocks_count - 1) + i2 / block_size;
+    return (bigger_blocks_count - 1) + i2 / min_block_size_;
 }
 
 void FullSparse::init_split(bool by_col_, int block_count_){
@@ -82,6 +86,8 @@ Sparse** FullSparse::split(){
   SPFOR(this){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
     sp = children[block_no];
+    debug_p(it_row(), it_col(), it_val());
+    debug_d(block_no);
     sp->insert(it_val(), it_col(), it_row());
 
     //assert(sp->it_val() == it_val());
@@ -90,7 +96,6 @@ Sparse** FullSparse::split(){
 
     //debug_d(sp->nnz);
 
-    next();
   }
   return children;
 }
