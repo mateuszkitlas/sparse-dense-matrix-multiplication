@@ -22,38 +22,50 @@ inline int which_block(int matrix_size, int block_count, int matrix_i){
     return (bigger_blocks_count - 1) + i2 / block_size;
 }
 
-void FullSparse::init_split(bool by_col, int block_count){
-  this->by_col = by_col;
-  this->block_count = block_count;
+void FullSparse::init_split(bool by_col_, int block_count_){
+  this->by_col = by_col_;
+  this->block_count = block_count_;
+  debug_d(by_col);
+  debug_d(block_count);
 
 
-  int* nnzs = new int[block_count];
+  int* nnzs = new int[block_count]();
+  //for(int block_no=0; block_no<block_count; ++block_no)
+  //  nnzs[block_no] = 0;
+
   int nnz_max = 0;
 
   for(begin(); !end(); next()){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
     nnzs[block_no]++;
   }
-  for(int block_no=0; block_no<block_count; ++block_no)
-    nnz_max = std::max(nnz_max, nnzs[block_no]);
+  nnz_max = *std::max_element(nnzs, nnzs + block_count);
+  debug_d(nnz_max);
 
-  split_nnzs = nnzs;
-  split_nnz_max = nnz_max;
-  split_row_no_max = by_col ? side() : max_block_size(side(), block_count);
+  this->split_nnzs = nnzs;
+  ::split_nnz_max = nnz_max;
+  ::split_row_no_max = by_col ? side() : max_block_size(side(), block_count);
 }
 
 Sparse** FullSparse::split(){
+  debug_d(block_count);
+
   Sparse** children = new Sparse*[block_count];
+  Sparse* sp;
 
   int first_incl = 0; //first col/row in block
   int this_block_size;
 
+  debug_d(::split_row_no_max);
+  debug_d(::split_nnz_max);
   for(int block_no=0; block_no<block_count; ++block_no){
     this_block_size = block_size(side(), block_count, block_no);
+    debug_d(this_block_size);
+    debug_d(split_nnzs[block_no]);
 
-    children[block_no] = Sparse::create(
-      split_row_no_max,
-      split_nnz_max,
+    sp = children[block_no] = Sparse::create(
+      ::split_row_no_max,
+      ::split_nnz_max,
       by_col ? 0 : first_incl, //first row
       by_col ? first_incl : 0, //first col
       by_col ? side() : this_block_size, //row_no
@@ -61,16 +73,23 @@ Sparse** FullSparse::split(){
       split_nnzs[block_no] //nnz
     );
 
-    children[block_no]->block_no = block_no;
+    sp->block_no = block_no;
 
     first_incl += this_block_size;
   }
 
-  debug_s("partition data");
-  while(!this->end()){
+  debug("partition data");
+  SPFOR(this){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    debug_d(block_no);
-    children[block_no]->insert(it_val(), it_col(), it_row());
+    sp = children[block_no];
+    sp->insert(it_val(), it_col(), it_row());
+
+    //assert(sp->it_val() == it_val());
+    //assert(sp->it_col() <= it_col());
+    //assert(sp->it_row() <= it_row());
+
+    //debug_d(sp->nnz);
+
     next();
   }
   return children;

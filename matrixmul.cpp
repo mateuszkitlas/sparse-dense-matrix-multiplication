@@ -18,7 +18,6 @@ int main(int argc, char * argv[])
 
   double comm_start = 0, comm_end = 0, comp_start = 0, comp_end = 0;
   int num_processes = 1;
-  int mpi_rank = 0;
   int exponent = 1;
   double ge_element = 0;
   int count_ge = 0;
@@ -27,11 +26,10 @@ int main(int argc, char * argv[])
   FullSparse* full_sparse = NULL; //only for coordinator
   bool by_col = true; //by_col == true -> split column as in "colmn A alg"
 
-#ifndef DONT_USE_MPI
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-#endif
+  debug_d(mpi_rank);
 
 
   while ((option = getopt(argc, argv, "vis:f:c:e:g:")) != -1) {
@@ -43,9 +41,9 @@ int main(int argc, char * argv[])
       by_col = false;
       break;
     case 'f':
-    //------------------------
-    //---  load full_sparse
-    //------------------------
+      //------------------------
+      //---  load full_sparse
+      //------------------------
       if ((mpi_rank) == 0)
       {
         FILE *file_sparse = fopen(optarg, "r");
@@ -60,6 +58,8 @@ int main(int argc, char * argv[])
           fscanf(file_sparse, "%d", &full_sparse->IA[i]);
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
+        debug_s("full_sparse loaded");
+        full_sparse->print();
       }
       break;
     case 'c': repl_fact = atoi(optarg);
@@ -76,7 +76,7 @@ int main(int argc, char * argv[])
       return 3;
     }
   }
-  if ((gen_seed == -1) || ((mpi_rank == 0) && (sparse == NULL)))
+  if ((gen_seed == -1) || ((mpi_rank == 0) && (full_sparse == NULL)))
   {
     fprintf(stderr, "error: missing seed or sparse matrix file; exiting\n");
     MPI_Finalize();
@@ -88,21 +88,16 @@ int main(int argc, char * argv[])
   //------------------------
   //---  scatter
   //------------------------
+  debug("scatter barrier");
   MPI_Barrier(MPI_COMM_WORLD);
   comm_start = MPI_Wtime();
+  MPI_Request mpi_meta_init_req;
   if(mpi_rank == 0){
-    int block_count =
-#ifdef DONT_USE_MPI
-      full_sparse->row_no / 3 + 1;
-#else
-      num_processes;
-#endif
-    MPI_Request mpi_meta_init_req;
-
+    int block_count = num_processes;
 
     full_sparse->init_split(by_col, block_count);
-    split_row_no_max = full_sparse->split_row_no_max;
-    split_nnz_max = full_sparse->split_nnz_max;
+
+    debug("coordinator ibcast");
     MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
 
     Sparse** mini_sparses = full_sparse->split();
@@ -110,6 +105,7 @@ int main(int argc, char * argv[])
     delete full_sparse;
 
     sparse = mini_sparses[0];
+    sparse->print();
     Sparse *sp;
     for(int block_no=1; block_no<block_count; ++block_no){
       sp = mini_sparses[block_no];
@@ -117,6 +113,7 @@ int main(int argc, char * argv[])
       sp->send(block_no);
     }
 
+    debug("coordinator broadcast wait");
 
     MPI_Wait(&mpi_meta_init_req);
     for(int block_no=1; block_no<block_count; ++block_no){
@@ -127,7 +124,10 @@ int main(int argc, char * argv[])
     }
     delete mini_sparses;
   } else {
-    MPI_Bcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD);
+    debug("waiting for broadcast from coordinator");
+    MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
+    MPI_Wait(&mpi_meta_init_req);
+    debug("got broadcast from coordinator");
     sparse = Sparse::mpi_create(split_row_no_max, split_nnz_max);
     sparse->recv(0, mpi_rank);
     sparse->recv_wait();
@@ -146,6 +146,7 @@ int main(int argc, char * argv[])
   //------------------------
   //---  free A
   //------------------------
+  sparse->print();
   sparse->free_csr();
   delete sparse;
 

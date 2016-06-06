@@ -45,7 +45,7 @@ Sparse* Sparse::create(
   sp->IA[1]=0;
   sp->JA[0]=0;
   sp->JA[1]=0;
-  sp->A[0]=0;
+  //sp->A[0]=0;
 
   assert(sp->first_row == first_row);
   assert(sp->first_col == first_col);
@@ -53,8 +53,6 @@ Sparse* Sparse::create(
   assert(sp->col_no == col_no);
   assert(sp->nnz == nnz);
   assert(sp->IA < sp->JA);
-  assert((void*)sp->JA < (void*)sp->A);
-
 
   return sp;
 }
@@ -79,13 +77,74 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
 
 void Sparse::free_csr(){ free(csr); }
 
+void Sparse::printA(){
+  begin();
+  for(int r=0; r<row_no; ++r){
+    for(int c=0; c<col_no; ++c){
+      if(it_row() == r && it_col() == c){
+        printf("%.2lf ", it_val());
+        next();
+      }
+      else
+        printf("     ");
+    }
+    printf("\n");
+  }
+  assert(end());
+}
+
 void Sparse::print(){
 #ifdef DEBUG
   printf("\
+%d   block_no = %d\n\
     first_row = %d\n\
     first_col = %d\n\
     row_no = %d\n\
     col_no = %d\n\
-    nnz = %d\n\n", first_row, first_col, row_no, col_no, nnz);
+    nnz = %d\n\
+    A[0] = %lf\n\
+    A[%d] = %lf\n\n",
+mpi_rank, block_no,
+    first_row,
+    first_col,
+    row_no,
+    col_no,
+    nnz,
+    A[0],
+    nnz-1, A[nnz-1]
+    );
+  printf("JA: ");
+  for(int i=0; i<nnz; ++i)
+    printf("%d ", JA[i]);
+  printf("\n");
+  printf("IA: ");
+  for(int i=0; i<=row_no; ++i)
+    printf("%d ", IA[i]);
+  printf("\n");
+  printA();
 #endif
+}
+
+int Sparse::it_row(){
+  while(iterA >= IA[iterIA])
+    ++iterIA;
+  return iterIA-1;
+}
+void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this is child matrix
+  //debug_s("inserting");
+  JA[iterA+1] = g_col - first_col;
+  A[iterA+1] = v;
+
+  int last_row = it_row();
+  int new_row = g_row - first_row;
+  if(last_row == new_row){
+    ++IA[iterIA];
+  } else {
+    IA[iterIA + 1] = IA[iterIA] + 1;
+    iterIA++;
+  }
+  iterA++;
+
+
+  //debug_s("inserted");
 }

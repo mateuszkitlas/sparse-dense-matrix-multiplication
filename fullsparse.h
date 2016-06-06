@@ -7,11 +7,8 @@
 class FullSparse: public Sparse {
   public:
 
-  //TODO init!
   bool by_col;
   int block_count;
-  int split_nnz_max;
-  int split_row_no_max;
   int* split_nnzs;
 
   int side(); //row_no; asserts row_no == col_no
