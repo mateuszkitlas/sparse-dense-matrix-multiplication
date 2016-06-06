@@ -1,4 +1,5 @@
 #include "fullsparse.h"
+#include "common.h"
 #include <stdlib.h>
 #include <assert.h>
 
@@ -21,7 +22,11 @@ inline int which_block(int matrix_size, int block_count, int matrix_i){
     return (bigger_blocks_count - 1) + i2 / block_size;
 }
 
-int FullSparse::init_split(bool by_col, int block_count){
+void FullSparse::init_split(bool by_col, int block_count){
+  this->by_col = by_col;
+  this->block_count = block_count;
+
+
   int* nnzs = new int[block_count];
   int nnz_max = 0;
 
@@ -34,7 +39,7 @@ int FullSparse::init_split(bool by_col, int block_count){
 
   split_nnzs = nnzs;
   split_nnz_max = nnz_max;
-  split_ro_no_max = by_col ? side() : max_block_size(side(), block_count);
+  split_row_no_max = by_col ? side() : max_block_size(side(), block_count);
 }
 
 Sparse** FullSparse::split(){
@@ -53,7 +58,7 @@ Sparse** FullSparse::split(){
       by_col ? first_incl : 0, //first col
       by_col ? side() : this_block_size, //row_no
       by_col ? this_block_size : side(), //col_no
-      children_nnz[block_no] //nnz
+      split_nnzs[block_no] //nnz
     );
 
     children[block_no]->block_no = block_no;
@@ -75,7 +80,7 @@ FullSparse* FullSparse::create(
     int row_no,
     int col_no,
     int nnz){
-  void* csr = Sparse::csr_alloc(row_no_max, nnz_max);
+  void* csr = Sparse::csr_alloc(row_no, nnz);
 
   *( ((int*)csr) + 2 ) = row_no;
   *( ((int*)csr) + 4 ) = nnz;
@@ -103,4 +108,11 @@ FullSparse* FullSparse::create(
 
 
   return sp;
+}
+
+
+
+int FullSparse::side(){
+  assert(row_no == col_no);
+  return col_no;
 }

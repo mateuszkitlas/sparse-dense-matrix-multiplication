@@ -4,23 +4,7 @@
 #include <stdio.h>
 #include <cstdio>
 #include <mpi.h>
-
-int MPI_Wait(MPI_Request* request){
-  return MPI_Wait(request, MPI_STATUS_IGNORE);
-}
-#ifdef DEBUG
-#define debug_s(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%s \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
-#define debug_d(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%d \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
-#else
-#define debug_s(arg) {;};
-#define debug_d(arg) {;};
-#endif
-
-
-int mpi_meta_init[2] = {-1, -1};
-int mpi_meta_init_size = 2;
-int &split_row_no_max = mpi_meta_init[0];
-int &split_nnz_max = mpi_meta_init[1];
+#include "common.h"
 
 class Sparse {
   public:
@@ -135,6 +119,7 @@ class Sparse {
 
   private:
   int iterA, iterIA;
+  protected:
   int nnz_max, row_no_max;
 };
 

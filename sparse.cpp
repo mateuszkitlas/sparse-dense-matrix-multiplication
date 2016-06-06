@@ -1,6 +1,7 @@
 #include "sparse.h"
 #include <stdlib.h>
 #include <assert.h>
+#include "common.h"
 
 size_t Sparse::csr_alloc_size(
       int row_no_max,
@@ -76,102 +77,7 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
   block_no = -1;
 }
 
-//divides the most equally
-inline int block_size(int matrix_size, int block_count, int block_no){
-  return matrix_size / block_count + (matrix_size % block_count == block_no + 1);
-}
-
-inline int max_block_size(int matrix_size, int block_count){
-  return block_size(matrix_size, block_count, 0);
-}
-inline int which_block(int matrix_size, int block_count, int matrix_i){
-  int bigger_blocks_count = matrix_size % block_count;
-  int block_size = matrix_size / block_count; //+1 in first bigger_blocks_count blocks
-  int i2 = matrix_i - (block_size + 1) * bigger_blocks_count;
-  if(i2 < 0)
-    return matrix_i / (block_size + 1);
-  else
-    return (bigger_blocks_count - 1) + i2 / block_size;
-}
-
-//int Sparse::nnz_max_by_col(int block_count){
-//  int* nnzs = new int[block_count];
-//  int m = 0;
-//  for(int block_no=0; i<block_count; ++block_no)
-//    nnzs[block_no]=0;
-//  for(int i=0; i<this->nnz; ++i)
-//    m = max(m, ++(nnzs[this->JA[i]]));
-//  return m;
-//}
-//
-//int Sparse::nnz_max_by_row(int block_count){
-//  int m = 0;
-//  int last_row = 0; //excluded
-//  int this_row = 0; //included
-//  for(int block_no=0; block_no<block_count; ++block_no){
-//    this_row += block_size(this->row_no, block_count, block_no);
-//    m = max(m, IA[this_row]-IA[last_row]);
-//    last_row = this_row;
-//  }
-//  return m;
-//}
-
-int Sparse::split_nnz_max(bool by_col, int block_count){
-  int* nnzs = new int[block_count];
-  int nnz_max = 0;
-
-  for(begin(); !end(); next()){
-    int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    nnzs[block_no]++;
-  }
-  for(int block_no=0; block_no<block_count; ++block_no)
-    nnz_max = std::max(nnz_max, nnzs[block_no]);
-  return nnz_max;
-}
-
-int Sparse::split_row_no_max(bool by_col, int block_count){
-  return by_col ? side() : max_block_size(side(), block_count);
-}
-
-Sparse** Sparse::split(bool by_col, int block_count, int split_row_no_max, int split_nnz_max){
-  Sparse** children = new Sparse*[block_count];
-
-  int first_incl = 0; //first col/row in block
-  int this_block_size;
-
-  for(int block_no=0; block_no<block_count; ++block_no){
-    this_block_size = block_size(side(), block_count, block_no);
-
-    children[block_no] = Sparse::create(
-      split_row_no_max,
-      split_nnz_max,
-      by_col ? 0 : first_incl, //first row
-      by_col ? first_incl : 0, //first col
-      by_col ? side() : this_block_size, //row_no
-      by_col ? this_block_size : side(), //col_no
-      children_nnz[block_no] //nnz
-    );
-
-    children[block_no]->block_no = block_no;
-
-    first_incl += this_block_size;
-  }
-
-  debug_s("partition data");
-  while(!this->end()){
-    int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    debug_d(block_no);
-    children[block_no]->insert(it_val(), it_col(), it_row());
-    next();
-  }
-  return children;
-}
-
 void Sparse::free_csr(){ free(csr); }
-int Sparse::side(){
-  assert(row_no == col_no);
-  return col_no;
-}
 
 void Sparse::print(){
 #ifdef DEBUG

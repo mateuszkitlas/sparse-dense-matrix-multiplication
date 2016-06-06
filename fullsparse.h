@@ -4,11 +4,6 @@
 #include "sparse.h"
 
 
-int mpi_meta_init[2] = {-1, -1};
-int mpi_meta_init_size = 2;
-int &split_row_no_max = mpi_meta_init[0];
-int &split_nnz_max = mpi_meta_init[1];
-
 class FullSparse: public Sparse {
   public:
 
@@ -23,7 +18,9 @@ class FullSparse: public Sparse {
 
   void init_split(bool by_col, int block_count);
   Sparse** split();
-  FullSparse* create(int row_no, int col_no, int nnz);
+  static FullSparse* create(int row_no, int col_no, int nnz);
+
+  using Sparse::Sparse;
 
 };
 

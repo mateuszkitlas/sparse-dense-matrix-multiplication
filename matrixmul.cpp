@@ -5,6 +5,7 @@
 #include "densematgen.h"
 #include "sparse.h"
 #include "fullsparse.h"
+#include "common.h"
 
 int main(int argc, char * argv[])
 {
@@ -24,6 +25,7 @@ int main(int argc, char * argv[])
 
   Sparse* sparse = NULL;
   FullSparse* full_sparse = NULL; //only for coordinator
+  bool by_col = true; //by_col == true -> split column as in "colmn A alg"
 
 #ifndef DONT_USE_MPI
   MPI_Init(&argc, &argv);
@@ -36,7 +38,9 @@ int main(int argc, char * argv[])
     switch (option) {
     case 'v': show_results = 1; 
       break;
-    case 'i': use_inner = 1;
+    case 'i':
+      use_inner = 1;
+      by_col = false;
       break;
     case 'f':
     //------------------------
@@ -56,8 +60,6 @@ int main(int argc, char * argv[])
           fscanf(file_sparse, "%d", &full_sparse->IA[i]);
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
-
-        full_sparse->init_split();
       }
       break;
     case 'c': repl_fact = atoi(optarg);
@@ -89,16 +91,16 @@ int main(int argc, char * argv[])
   MPI_Barrier(MPI_COMM_WORLD);
   comm_start = MPI_Wtime();
   if(mpi_rank == 0){
-    //by_col == true -> split column as in "colmn A alg"
-    bool by_col = true;
+    int block_count =
+#ifdef DONT_USE_MPI
+      full_sparse->row_no / 3 + 1;
+#else
+      num_processes;
+#endif
     MPI_Request mpi_meta_init_req;
 
-#ifdef DONT_USE_MPI
-    int block_count = row_no / 3 + 1;
-#else
-    int block_count = num_processes;
-#endif
 
+    full_sparse->init_split(by_col, block_count);
     split_row_no_max = full_sparse->split_row_no_max;
     split_nnz_max = full_sparse->split_nnz_max;
     MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
