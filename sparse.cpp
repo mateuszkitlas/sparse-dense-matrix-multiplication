@@ -87,41 +87,42 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
 void Sparse::free_csr(){ free(csr); }
 
 void Sparse::printA(){
+  char x[10000];
   begin();
   for(int r=0; r<row_no; ++r){
     for(int c=0; c<col_no; ++c){
       if(it_row() == r && it_col() == c){
-        printf("%.2lf ", it_val());
+        sprintf(x, "%s%.2lf ", x, it_val());
         next();
       }
       else
-        printf("     ");
+        sprintf(x, "%s     ", x);
     }
-    printf("\n");
+    sprintf(x, "%s\n", x);
   }
+  printf("%s", x);
   assert(end());
 }
 
 void Sparse::print(){
 #ifdef DEBUG
+  /*
   printf("\
 %d   block_no = %d\n\
     first_row = %d\n\
     first_col = %d\n\
     row_no = %d\n\
     col_no = %d\n\
-    nnz = %d\n\
-    A[0] = %lf\n\
-    A[%d] = %lf\n\n",
+    nnz = %d\n\n"
 mpi_rank, block_no,
     first_row,
     first_col,
     row_no,
     col_no,
     nnz,
-    A[0],
-    nnz-1, A[nnz-1]
     );
+  */
+  /*
   printf("JA: ");
   for(int i=0; i<=nnz; ++i)
     printf("%d ", JA[i]);
@@ -129,7 +130,7 @@ mpi_rank, block_no,
   printf("IA: ");
   for(int i=0; i<=row_no; ++i)
     printf("%d ", IA[i]);
-  printf("\n");
+  printf("\n");*/
   printA();
 #endif
 }

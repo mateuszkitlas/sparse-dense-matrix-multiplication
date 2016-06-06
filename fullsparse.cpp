@@ -64,8 +64,8 @@ Sparse** FullSparse::split(){
   debug_d(::split_nnz_max);
   for(int block_no=0; block_no<block_count; ++block_no){
     this_block_size = block_size(side(), block_count, block_no);
-    debug_d(this_block_size);
-    debug_d(split_nnzs[block_no]);
+    //debug_d(this_block_size);
+    //debug_d(split_nnzs[block_no]);
 
     sp = children[block_no] = Sparse::create(
       ::split_row_no_max,
@@ -86,8 +86,6 @@ Sparse** FullSparse::split(){
   SPFOR(this){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
     sp = children[block_no];
-    if(block_no == 1)
-      debug_p(it_row(), it_col(), it_val());
     //debug_d(block_no);
     sp->insert(it_val(), it_col(), it_row());
 

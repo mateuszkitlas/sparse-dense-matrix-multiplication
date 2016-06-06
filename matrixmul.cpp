@@ -105,11 +105,11 @@ int main(int argc, char * argv[])
     delete full_sparse;
 
     sparse = mini_sparses[0];
-    sparse->print();
+    //sparse->print();
     Sparse *sp;
     for(int block_no=1; block_no<block_count; ++block_no){
       sp = mini_sparses[block_no];
-      sp->print();
+      //sp->print();
       sp->send(block_no);
     }
 
