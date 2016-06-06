@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <mpi.h>
 
+int MPI_Wait(MPI_Request* request){
+  return MPI_Wait(request, MPI_STATUS_IGNORE);
+}
 #ifdef DEBUG
 #define debug_s(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%s \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
 #define debug_d(arg) { fprintf(stderr, "%s:%d in %s()  | %s=%d \n", __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
@@ -13,6 +16,11 @@
 #define debug_d(arg) {;};
 #endif
 
+
+int mpi_meta_init[2] = {-1, -1};
+int mpi_meta_init_size = 2;
+int &split_row_no_max = mpi_meta_init[0];
+int &split_nnz_max = mpi_meta_init[1];
 
 class Sparse {
   public:
@@ -29,7 +37,6 @@ class Sparse {
   static void* csr_alloc(
       int row_no_max,
       int nnz_max);
-  Sparse** split(bool by_col, int block_count);
 
   void begin(){
     iterA = 0;
@@ -68,6 +75,16 @@ class Sparse {
   size_t csr_size(){
     return sizeof(int)*(5 + row_no + 1 + nnz) + sizeof(double)*(nnz);
   }
+  static Sparse* mpi_create(int row_no_max, int nnz_max){
+    return create(
+        row_no_max,
+        nnz_max,
+        -1,
+        -1,
+        row_no_max,
+        -1,
+        nnz_max);
+  }
   static Sparse* create(
       int row_no_max,
       int nnz_max,
@@ -80,19 +97,41 @@ class Sparse {
   void free_csr();
   int side(); //row_no; asserts row_no == col_no
 
+  int split_nnz_max(bool by_col, int block_count);
+  int split_row_no_max(bool by_col, int block_count);
+  Sparse** split(bool by_col, int block_count, int split_row_no_max, int split_nnz_max);
 
 
+  //------------------------
+  //---  MPI
+  //------------------------
   MPI_Request send_req, recv_req;
-  void send(int rank){
-    send_req = MPI_Isend(csr, csr_size, MPI_BYTE, rank, 1410, MPI_COMM_WORLD);
+  void send(int rank);
+  void recv(int rank, int block_no);
+  static bool MPI_Test(MPI_Request* req);
+  bool send_ready();
+  bool recv_ready();
+  void recv_wait(){
+    if(!recv_ready()){
+      MPI_Wait(&recv_req);
+      recv_ready();
+    }
   }
-  MPI_Request Sparse::recv(int rank, void* csr, int row_no_max, int nnz_max){
-    MPI_Request recv_req = MPI_Irecv(
-        csr,
-        csr_alloc_size(row_no_max, nnz_max),
-        MPI_BYTE,
-        rank, 1410, MPI_COMM_WORLD);
+  void send_wait(){
+    if(!send_ready()){
+      MPI_Wait(&send_req);
+      send_ready();
+    }
   }
+  //------------------------
+
+  void update_refs(){
+    IA = ((int*)csr) + 5;
+    JA = IA + row_no + 1;
+    A = (double*)(JA + nnz);
+  }
+
+  int block_no;
 
   private:
   int iterA, iterIA;

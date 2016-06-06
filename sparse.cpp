@@ -66,13 +66,14 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
     , col_no(    *( ((int*)csr) + 3 ) )
     , nnz(       *( ((int*)csr) + 4 ) )
   {
+  send_req = MPI_REQUEST_NULL;
+  recv_req = MPI_REQUEST_NULL;
   assert(csr == this->csr);
   this->row_no_max = row_no_max;
   this->nnz_max = nnz_max;
-  IA = ((int*)csr) + 5;
-  JA = IA + row_no + 1;
-  A = (double*)(JA + nnz);
+  update_refs();
   begin();
+  block_no = -1;
 }
 
 //divides the most equally
@@ -115,43 +116,43 @@ inline int which_block(int matrix_size, int block_count, int matrix_i){
 //  return m;
 //}
 
-
-Sparse** Sparse::split(bool by_col, int block_count){ //by_col == true -> split column as in "colmn A alg"
-  debug_s("start sparse");
-  Sparse** children = new Sparse*[block_count];
-  int* children_nnz = new int*[block_count];
-  int child_nnz_max = 0;
+int Sparse::split_nnz_max(bool by_col, int block_count){
+  int* nnzs = new int[block_count];
+  int nnz_max = 0;
 
   for(begin(); !end(); next()){
     int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    children_nnz[block_no]++;
+    nnzs[block_no]++;
   }
   for(int block_no=0; block_no<block_count; ++block_no)
-    child_nnz_max = max(child_nnz_max, children_nnz[block_no]);
+    nnz_max = std::max(nnz_max, nnzs[block_no]);
+  return nnz_max;
+}
 
-  //TODO tutaj chybba może być min(max_block_size, nnz_max)
-  int child_row_no_max = by_col ? side() : max_block_size(side(), block_count);
+int Sparse::split_row_no_max(bool by_col, int block_count){
+  return by_col ? side() : max_block_size(side(), block_count);
+}
+
+Sparse** Sparse::split(bool by_col, int block_count, int split_row_no_max, int split_nnz_max){
+  Sparse** children = new Sparse*[block_count];
+
   int first_incl = 0; //first col/row in block
   int this_block_size;
-  //TODO MPI nnz_max
-  //alloc child Sparses
+
   for(int block_no=0; block_no<block_count; ++block_no){
-    debug_d(block_no);
-    debug_d(block_count);
     this_block_size = block_size(side(), block_count, block_no);
-    debug_d(this_block_size);
-    debug_d(child_row_no_max);
-    debug_d(child_nnz_max);
 
     children[block_no] = Sparse::create(
-      child_row_no_max,
-      child_nnz_max,
+      split_row_no_max,
+      split_nnz_max,
       by_col ? 0 : first_incl, //first row
       by_col ? first_incl : 0, //first col
       by_col ? side() : this_block_size, //row_no
       by_col ? this_block_size : side(), //col_no
       children_nnz[block_no] //nnz
     );
+
+    children[block_no]->block_no = block_no;
 
     first_incl += this_block_size;
   }

@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <mpi.h>
 #include <assert.h>
 #include <getopt.h>
 
@@ -23,6 +22,7 @@ int main(int argc, char * argv[])
   int count_ge = 0;
 
   Sparse* sparse = NULL;
+  Sparse* full_sparse = NULL; //only for coordinator
 
 #ifndef DONT_USE_MPI
   MPI_Init(&argc, &argv);
@@ -37,43 +37,25 @@ int main(int argc, char * argv[])
       break;
     case 'i': use_inner = 1;
       break;
-    case 'f': if ((mpi_rank) == 0)
+    case 'f':
+    //------------------------
+    //---  load full_sparse
+    //------------------------
+      if ((mpi_rank) == 0)
       {
-        debug_s(optarg);
         FILE *file_sparse = fopen(optarg, "r");
         int row_no, col_no, nnz, nnz_max;
         fscanf(file_sparse, "%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
-        debug_d(row_no);
         assert(col_no == row_no);
 
-        Sparse *full_sparse = Sparse::create(row_no, nnz, 0, 0, row_no, col_no, nnz);
-        for(int i=0; i<nnz; ++i){
+        full_sparse = Sparse::create(row_no, nnz, 0, 0, row_no, col_no, nnz);
+        for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%lf", &full_sparse->A[i]);
-        }
-        for(int i=0; i<(row_no+1); ++i){
+        for(int i=0; i<(row_no+1); ++i)
           fscanf(file_sparse, "%d", &full_sparse->IA[i]);
-        }
-        for(int i=0; i<nnz; ++i){
+        for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
-        }
 
-        debug_d(nnz);
-#ifdef DONT_USE_MPI
-        int block_count = row_no / 3 + 1;
-#else
-        int block_count = num_processes;
-#endif
-        Sparse** mini_sparses = full_sparse->split(true, block_count);
-        debug_s("done split");
-        full_sparse->print();
-        full_sparse->free_csr();
-        delete full_sparse;
-        for(int block_no=0; block_no<block_count; ++block_no){
-          mini_sparses[block_no]->print();
-          mini_sparses[block_no]->free_csr();
-          delete mini_sparses[block_no];
-        }
-        delete mini_sparses;
       }
       break;
     case 'c': repl_fact = atoi(optarg);
@@ -98,16 +80,72 @@ int main(int argc, char * argv[])
   }
 
 
-  comm_start =  MPI_Wtime();
-  // FIXME: scatter sparse matrix; cache sparse matrix; cache dense matrix
+
+  //------------------------
+  //---  scatter
+  //------------------------
+  MPI_Barrier(MPI_COMM_WORLD);
+  comm_start = MPI_Wtime();
+  if(mpi_rank == 0){
+    //by_col == true -> split column as in "colmn A alg"
+    bool by_col = true;
+    MPI_Request mpi_meta_init_req;
+
+#ifdef DONT_USE_MPI
+    int block_count = row_no / 3 + 1;
+#else
+    int block_count = num_processes;
+#endif
+
+    split_row_no_max = full_sparse->split_row_no_max(by_col, block_count);
+    split_nnz_max = full_sparse->split_nnz_max(by_col, block_count);
+    MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
+
+    Sparse** mini_sparses = full_sparse->split(by_col, block_count, split_row_no_max, split_nnz_max);
+    debug_s("done split");
+    full_sparse->print();
+    full_sparse->free_csr();
+    delete full_sparse;
+    sparse = mini_sparses[0];
+    Sparse *sp;
+    for(int block_no=1; block_no<block_count; ++block_no){
+      sp = mini_sparses[block_no];
+      sp->print();
+      sp->send(block_no);
+    }
+
+
+    MPI_Wait(&mpi_meta_init_req);
+    for(int block_no=1; block_no<block_count; ++block_no){
+      sp = mini_sparses[block_no];
+      sp->send_wait();
+      sp->free_csr();
+      delete sp;
+    }
+    delete mini_sparses;
+  } else {
+    MPI_Bcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD);
+    sparse = Sparse::mpi_create(split_row_no_max, split_nnz_max);
+    sparse->recv(0, mpi_rank);
+    sparse->recv_wait();
+  }
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
 
+  //------------------------
+  //---  compute
+  //------------------------
   comp_start = MPI_Wtime();
-  // FIXME: compute C = A ( A ... (AB ) )
   MPI_Barrier(MPI_COMM_WORLD);
   comp_end = MPI_Wtime();
-  
+
+
+  //------------------------
+  //---  free A
+  //------------------------
+  sparse->free_csr();
+  delete sparse;
+
   if (show_results) 
   {
     // FIXME: replace the following line: print the whole result matrix
@@ -118,6 +156,7 @@ int main(int argc, char * argv[])
     // FIXME: replace the following line: count ge elements
     printf("54\n");
   }
+
 
   MPI_Finalize();
   return 0;
