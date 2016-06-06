@@ -4,6 +4,7 @@
 
 #include "densematgen.h"
 #include "sparse.h"
+#include "fullsparse.h"
 
 int main(int argc, char * argv[])
 {
@@ -22,7 +23,7 @@ int main(int argc, char * argv[])
   int count_ge = 0;
 
   Sparse* sparse = NULL;
-  Sparse* full_sparse = NULL; //only for coordinator
+  FullSparse* full_sparse = NULL; //only for coordinator
 
 #ifndef DONT_USE_MPI
   MPI_Init(&argc, &argv);
@@ -48,7 +49,7 @@ int main(int argc, char * argv[])
         fscanf(file_sparse, "%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
         assert(col_no == row_no);
 
-        full_sparse = Sparse::create(row_no, nnz, 0, 0, row_no, col_no, nnz);
+        full_sparse = FullSparse::create(row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%lf", &full_sparse->A[i]);
         for(int i=0; i<(row_no+1); ++i)
@@ -56,6 +57,7 @@ int main(int argc, char * argv[])
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
 
+        full_sparse->init_split();
       }
       break;
     case 'c': repl_fact = atoi(optarg);
@@ -97,15 +99,14 @@ int main(int argc, char * argv[])
     int block_count = num_processes;
 #endif
 
-    split_row_no_max = full_sparse->split_row_no_max(by_col, block_count);
-    split_nnz_max = full_sparse->split_nnz_max(by_col, block_count);
+    split_row_no_max = full_sparse->split_row_no_max;
+    split_nnz_max = full_sparse->split_nnz_max;
     MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
 
-    Sparse** mini_sparses = full_sparse->split(by_col, block_count, split_row_no_max, split_nnz_max);
-    debug_s("done split");
-    full_sparse->print();
+    Sparse** mini_sparses = full_sparse->split();
     full_sparse->free_csr();
     delete full_sparse;
+
     sparse = mini_sparses[0];
     Sparse *sp;
     for(int block_no=1; block_no<block_count; ++block_no){
