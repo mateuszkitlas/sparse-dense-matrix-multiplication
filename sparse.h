@@ -33,8 +33,18 @@ class Sparse {
   double val(){ return it_val(); }
   int it_col(){ return JA[iterA]; }
   int it_row();
-  int row(){ return it_row() + first_row; }
-  int col(){ return it_col() + first_col; }
+  int row(){
+    return it_row() + first_row;
+  }
+  int col(){
+    int result = it_col() + first_col;
+    if(result < 0){
+      debug_d(0+result);
+      debug_d(0+first_col);
+      debug_d(0+it_col());
+    }
+    return it_col() + first_col;
+  }
   void next(){ ++iterA; }
   bool end(){ return iterA == nnz; }
 
@@ -67,9 +77,15 @@ class Sparse {
   //------------------------
   //---  MPI
   //------------------------
+  int rank_from;
+  int send_counter;
+  int recv_counter;
+  bool done_multiplication;
   MPI_Request send_req, recv_req;
   void send(int rank);
   void recv(int rank, int block_no);
+  void send(); //knows where to send
+  void recv(); //knows where to send
   static bool MPI_Test(MPI_Request* req);
   bool send_ready();
   bool recv_ready();

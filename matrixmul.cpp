@@ -6,6 +6,7 @@
 #include "sparse.h"
 #include "fullsparse.h"
 #include "common.h"
+#include "compute.h"
 
 int main(int argc, char * argv[])
 {
@@ -107,9 +108,8 @@ int main(int argc, char * argv[])
 
     my_sparse = mini_sparses[0];
     //sparse->print();
-    Sparse *sp;
     for(int block_no=1; block_no<block_count; ++block_no){
-      sp = mini_sparses[block_no];
+      Sparse *sp = mini_sparses[block_no];
       //sp->print();
       sp->send(block_no);
     }
@@ -118,7 +118,7 @@ int main(int argc, char * argv[])
 
     MPI_Wait(&mpi_meta_init_req);
     for(int block_no=1; block_no<block_count; ++block_no){
-      sp = mini_sparses[block_no];
+      Sparse *sp = mini_sparses[block_no];
       sp->send_wait();
       sp->free_csr();
       delete sp;
@@ -135,29 +135,42 @@ int main(int argc, char * argv[])
 
 
   sparses = new Sparse*[repl_fact];
+  my_sparse->recv_wait();
+  debug("has my_sparse");
+  //my_sparse->print();
   sparses[0] = my_sparse;
   for(int ci = 1; ci<repl_fact; ci++){
     sparses[ci] = Sparse::mpi_create();
-    sparses[ci]->recv( mpi_no(-ci), mpi_no(-ci) );
-    my_sparse->send( mpi_no(ci) );
+    sparses[ci]->recv( mpi_no(ci), mpi_no(ci) );
+    my_sparse->send( mpi_no(-ci) );
   }
 
   //------------------------
   //---  dense inits
   //------------------------
+  int my_block_no = mpi_no(0);
 
   {
-    int my_block_no = mpi_no(0);
     if(by_col)
       assert((num_processes % repl_fact) == 0);
     else
       assert((num_processes % (repl_fact*repl_fact)) == 0);
 
+    //debug_d(my_block_no);
+    //debug_d(block_size(my_block_no));
     int
       row_no = by_col ? mpi_meta_init.side : block_size(my_block_no),
       col_no = by_col ? block_size(my_block_no) : mpi_meta_init.side,
       first_row = first_side(false, by_col, my_block_no),
       first_col = first_side(true, by_col, my_block_no);
+    if(by_col){
+      assert(first_row == 0);
+      assert(row_no == mpi_meta_init.side);
+    }
+    else {
+      assert(first_col == 0);
+      assert(col_no == mpi_meta_init.side);
+    }
     dense_b = new Dense(row_no, col_no, first_row, first_col, gen_seed);
     dense_c = new Dense(row_no, col_no, first_row, first_col);
   }
@@ -165,10 +178,10 @@ int main(int argc, char * argv[])
 
 
 
-  for(int ci = 0; ci<repl_fact; ci++){
+  /*for(int ci = 0; ci<repl_fact; ci++){
     sparses[ci]->recv_wait();
     sparses[ci]->send_wait();
-  }
+  }*/
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
 
@@ -177,6 +190,39 @@ int main(int argc, char * argv[])
   //------------------------
   comp_start = MPI_Wtime();
   MPI_Barrier(MPI_COMM_WORLD);
+
+
+  int ci=0;
+  int done_blocks=0;
+  int done_nothing=0;
+
+  while(done_blocks < block_count){
+    Sparse *sp = sparses[ci];
+    bool wait = false;
+    if(done_nothing >= repl_fact*2)
+      wait = true;
+    if(!sp->done_multiplication && sp->send_counter < num_processes){
+      sp->recv_wait();
+      if(sp->recv_ready()){
+        sp->send();
+        multiply(sp, dense_b, dense_c);
+        done_blocks++;
+        debug_d(block_i);
+        done_nothing = 0;
+      } else done_nothing++;
+    } else done_nothing++;
+    if(sp->done_multiplication && sp->send_ready() && sp->recv_counter < num_processes){
+      sp->recv();
+      done_nothing = 0;
+    } else done_nothing++;
+    ci = (ci+1) % repl_fact;
+  }
+
+  for(int ci=0; ci<repl_fact; ++ci)
+    if(!sp->send_ready())
+      sp->send_wait();
+
+
   comp_end = MPI_Wtime();
 
 

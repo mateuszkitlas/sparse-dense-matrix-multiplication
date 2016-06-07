@@ -9,7 +9,11 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col){
   this->col_no = col_no;
   this->first_row = first_row;
   this->first_col = first_col;
+#ifdef DEBUG
+  this->name = 'c';
+#endif
 }
+
 Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   data = new double[row_no*col_no];
   this->row_no = row_no;
@@ -19,7 +23,9 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   for(int r=0; r<row_no; ++r)
     for(int c=0; c<col_no; ++c)
       *my_val(r,c) = generate_double(seed, r + first_row, c + first_col);
-
+#ifdef DEBUG
+  this->name = 'b';
+#endif
 }
 
 Dense::~Dense(){
@@ -37,12 +43,30 @@ double* Dense::my_val(int row, int col){
 
 int Dense::my_row(int g_row){
   int result = g_row - first_row;
+#ifdef DEBUG
+  if(result >= row_no || first_row > g_row){
+    debug_s(&name);
+    debug_d(first_row);
+    debug_d(g_row);
+    debug_d(result);
+    debug_d(row_no);
+  }
+#endif
   assert(result < row_no);
+  assert(first_row <= g_row);
   return result;
 }
 
 int Dense::my_col(int g_col){
   int result = g_col - first_col;
   assert(result < col_no);
+  assert(first_col <= g_col);
+  /*if(result >= col_no){
+    debug_s(&name);
+    debug_d(first_col);
+    debug_d(g_col);
+    debug_d(result);
+    debug_d(col_no);
+  }*/
   return result;
 }

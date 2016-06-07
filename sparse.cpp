@@ -75,12 +75,15 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
   {
   send_req = MPI_REQUEST_NULL;
   recv_req = MPI_REQUEST_NULL;
+  send_counter = 0;
+  recv_counter = 0;
   assert(csr == this->csr);
   this->row_no_max = row_no_max;
   this->nnz_max = nnz_max;
   update_refs();
   begin();
   block_no = -1;
+  done_multiplication = false;
 }
 
 void Sparse::free_csr(){ free(csr); }
@@ -99,7 +102,7 @@ void Sparse::printA(){
     }
     sprintf(x, "%s\n", x);
   }
-  printf("%s", x);
+  fprintf(stderr, "%s", x);
   assert(end());
 }
 

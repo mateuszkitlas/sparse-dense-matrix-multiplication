@@ -29,15 +29,20 @@ int block_size(int block_no){
 int first_side(bool get_col, bool by_col, int block_no){
   ASSERTS;
   int &side = mpi_meta_init.side;
-  if(by_col == get_col)
-    return 0;
-  else{
-    int bigger_block_size = block_size(0);
-    int smaller_block_size = bigger_block_size - 1;
-    int smaller_blocks_count = block_no - side % block_count;
-    if(smaller_blocks_count > 0)
-      return smaller_blocks_count * smaller_block_size + bigger_block_size * (side % block_count);
-    else
-      return block_no * bigger_block_size;
-  }
+
+  if(by_col) //column A
+    if(!get_col) //first_row
+      return 0;
+
+  if(!by_col) //inner ABC
+    if(get_col) //first_col
+      return 0;
+
+  int bigger_block_size = block_size(0);
+  int smaller_block_size = bigger_block_size - 1;
+  int smaller_blocks_count = block_no - side % block_count;
+  if(smaller_blocks_count > 0)
+    return smaller_blocks_count * smaller_block_size + bigger_block_size * (side % block_count);
+  else
+    return block_no * bigger_block_size;
 }

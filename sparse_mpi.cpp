@@ -6,6 +6,7 @@ void Sparse::send(int rank){
   assert(block_no >= 0);
   MPI_Isend(csr, csr_size(), MPI_BYTE, rank, 1000+block_no, MPI_COMM_WORLD, &send_req);
   assert(send_req != MPI_REQUEST_NULL);
+  send_counter++;
 }
 
 void Sparse::recv(int rank, int block_no){
@@ -15,8 +16,11 @@ void Sparse::recv(int rank, int block_no){
       csr_alloc_size(row_no_max, nnz_max),
       MPI_BYTE,
       rank, 1000+block_no, MPI_COMM_WORLD, &recv_req);
-  assert(recv_req != MPI_REQUEST_NULL);
+  //assert(recv_req != MPI_REQUEST_NULL);
   this->block_no = block_no;
+  this->rank_from = rank;
+  recv_counter++;
+  done_multiplication = false;
 }
 
 bool Sparse::MPI_Test(MPI_Request* req){
@@ -39,7 +43,12 @@ bool Sparse::send_ready(){
 bool Sparse::recv_ready(){
   if(Sparse::MPI_Test(&recv_req)){
     update_refs();
-    debug_d(block_no);
+    //debug_d(block_no);
+    if(first_col < 0){
+      print();
+    }
+    assert(first_col >= 0);
+    assert(first_row >= 0);
     return true;
   } else {
     return false;
@@ -57,4 +66,12 @@ void Sparse::send_wait(){
     MPI_Wait(&send_req);
     send_ready();
   }
+}
+
+void Sparse::send(){
+  send( mpi_no(rank_from - repl_fact) );
+}
+
+void Sparse::recv(){
+  recv( mpi_no(rank_from + repl_fact), (block_no + repl_fact) % block_count );
 }

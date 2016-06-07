@@ -8,7 +8,12 @@
 
 class Dense {
   public:
-    double* data;
+
+#ifdef DEBUG
+    char name;
+#endif
+
+  double* data;
     int row_no;
     int col_no;
     int first_row;
