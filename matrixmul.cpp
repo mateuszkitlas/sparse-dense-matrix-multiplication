@@ -207,7 +207,7 @@ int main(int argc, char * argv[])
         sp->send();
         multiply(sp, dense_b, dense_c);
         done_blocks++;
-        debug_d(block_i);
+        debug_d(sp->block_no);
         done_nothing = 0;
       } else done_nothing++;
     } else done_nothing++;
@@ -218,9 +218,12 @@ int main(int argc, char * argv[])
     ci = (ci+1) % repl_fact;
   }
 
-  for(int ci=0; ci<repl_fact; ++ci)
+  for(int ci=0; ci<repl_fact; ++ci){
+    Sparse *sp = sparses[ci];
+    debug_d(sp->block_no);
     if(!sp->send_ready())
       sp->send_wait();
+  }
 
 
   comp_end = MPI_Wtime();
