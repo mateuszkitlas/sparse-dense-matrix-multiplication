@@ -1,12 +1,25 @@
 #!/bin/bash
 
+make clean && make ARGS="-DDEBUG"
+
 C=2
 let NP="$C*2"
-E=3
-SEED=10
-FILE=exported_tests/sparse05_00010_000
 
-cat $FILE
-echo "NP=$NP C=$C E=$E SEED=$SEED FILE=$FILE"
 
-make clean && make ARGS="-DDEBUG" && mpirun -np $NP ./matrixmul -f $FILE -s $SEED -c $C -e $E
+X=1
+Z=000
+Y=10
+
+
+A=$(ls -1 exported_tests/matrix* | sed -E "s/(.*)_(.*)_(.*)/\3/g" | head -n $(let Z1="$Z+1" ; echo $Z1) | tail -n 1)
+
+
+INFILE=exported_tests/sparse05_000${Y}_$Z
+OUTFILE=exported_tests/result_${X}_000${Y}_$Z
+BFILE=exported_tests/matrix01_000${Y}_$A
+
+cat $INFILE
+
+mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X
+cat $OUTFILE
+cat $BFILE

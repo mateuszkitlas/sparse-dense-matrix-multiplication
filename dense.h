@@ -21,6 +21,7 @@ class Dense {
     Dense(int row_no, int col_no, int first_row, int first_col);
     Dense(int row_no, int col_no, int first_row, int first_col, int seed);
     ~Dense();
+    void print();
 
     double* val(int g_row, int g_col);
 

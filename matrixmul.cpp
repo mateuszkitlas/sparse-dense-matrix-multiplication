@@ -195,13 +195,14 @@ int main(int argc, char * argv[])
   int ci=0;
   int done_blocks=0;
   int done_nothing=0;
+  int blocks_todo = block_count * exponent;
 
-  while(done_blocks < block_count){
+  while(done_blocks < blocks_todo){
     Sparse *sp = sparses[ci];
     bool wait = false;
     if(done_nothing >= repl_fact*2)
       wait = true;
-    if(!sp->done_multiplication && sp->send_counter < num_processes){
+    if(!sp->done_multiplication && sp->send_counter < num_processes * exponent){
       sp->recv_wait();
       if(sp->recv_ready()){
         sp->send();
@@ -211,12 +212,15 @@ int main(int argc, char * argv[])
         done_nothing = 0;
       } else done_nothing++;
     } else done_nothing++;
-    if(sp->done_multiplication && sp->send_ready() && sp->recv_counter < num_processes){
+    if(sp->done_multiplication && sp->send_ready() && sp->recv_counter < num_processes * exponent){
       sp->recv();
       done_nothing = 0;
     } else done_nothing++;
     ci = (ci+1) % repl_fact;
   }
+
+  dense_b->print();
+  dense_c->print();
 
   for(int ci=0; ci<repl_fact; ++ci){
     Sparse *sp = sparses[ci];
@@ -224,7 +228,6 @@ int main(int argc, char * argv[])
     if(!sp->send_ready())
       sp->send_wait();
   }
-
 
   comp_end = MPI_Wtime();
 

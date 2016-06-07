@@ -70,3 +70,17 @@ int Dense::my_col(int g_col){
   }*/
   return result;
 }
+
+void Dense::print(){
+  char x[10000];
+  sprintf(x, "--| %c %d |-----\n", name, mpi_no(0));
+  for(int r=0; r<row_no; ++r){
+    for(int c=0; c<col_no; ++c){
+      sprintf(x, "%s%.2lf ", x, *my_val(r,c));
+    }
+    sprintf(x, "%s\n", x);
+  }
+  sprintf(x, "%s-----------\n", x);
+  fprintf(stderr, "%s", x);
+}
+
