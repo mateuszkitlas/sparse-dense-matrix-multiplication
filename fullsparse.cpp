@@ -1,92 +1,74 @@
 #include "fullsparse.h"
 #include "common.h"
 #include <stdlib.h>
-#include <assert.h>
 
 
-//divides the most equally
-inline int block_size(int matrix_size, int block_count, int block_no){
-  return matrix_size / block_count + ((matrix_size % block_count) >= (block_no + 1) );
-}
+inline int max_block_size(){ return block_size(0); }
 
-inline int max_block_size(int matrix_size, int block_count){
-  return block_size(matrix_size, block_count, 0);
-}
-inline int min_block_size(int matrix_size, int block_count){
-  return block_size(matrix_size, block_count, block_count -1);
-}
-inline int which_block(int matrix_size, int block_count, int matrix_i){
-  int bigger_blocks_count = matrix_size % block_count;
-  int max_block_size_ = max_block_size(matrix_size, block_count);
-  int min_block_size_ = min_block_size(matrix_size, block_count);
-  int i2 = matrix_i - max_block_size_ * bigger_blocks_count;
+inline int min_block_size(){ return block_size(block_count -1 ); }
+
+inline int which_block(int matrix_i){
+  int &side = mpi_meta_init.side;
+  int bigger_blocks_count = side % block_count;
+  int bigger_block_size = block_size(0);
+  int i2 = matrix_i - bigger_block_size * bigger_blocks_count;
   if(i2 < 0)
-    return matrix_i / max_block_size_;
+    return matrix_i / bigger_block_size;
   else
-    return bigger_blocks_count + i2 / min_block_size_;
+    return bigger_blocks_count + i2 / (bigger_block_size - 1);
 }
 
-void FullSparse::init_split(bool by_col_, int block_count_){
+void FullSparse::init_split(bool by_col_){
+  ASSERTS;
   this->by_col = by_col_;
-  this->block_count = block_count_;
-  debug_d(by_col);
-  debug_d(block_count);
-
-
   int* nnzs = new int[block_count]();
-  //for(int block_no=0; block_no<block_count; ++block_no)
-  //  nnzs[block_no] = 0;
 
   int nnz_max = 0;
 
   for(begin(); !end(); next()){
-    int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    nnzs[block_no]++;
+    int block_i = which_block(by_col ? it_col() : it_row());
+    nnzs[block_i]++;
   }
   nnz_max = *std::max_element(nnzs, nnzs + block_count);
   debug_d(nnz_max);
 
   this->split_nnzs = nnzs;
-  ::split_nnz_max = nnz_max;
-  ::split_row_no_max = by_col ? side() : max_block_size(side(), block_count);
+  ::mpi_meta_init.nnz_max = nnz_max;
+  ::mpi_meta_init.row_no_max = by_col ? side() : max_block_size();
 }
 
 Sparse** FullSparse::split(){
-  debug_d(block_count);
-
   Sparse** children = new Sparse*[block_count];
   Sparse* sp;
 
   int first_incl = 0; //first col/row in block
-  int this_block_size;
 
-  debug_d(::split_row_no_max);
-  debug_d(::split_nnz_max);
-  for(int block_no=0; block_no<block_count; ++block_no){
-    this_block_size = block_size(side(), block_count, block_no);
-    //debug_d(this_block_size);
-    //debug_d(split_nnzs[block_no]);
+  for(int block_i=0; block_i<block_count; ++block_i){
+    debug_d(block_count);
+    debug_d(::block_size(block_i));
+    debug_d(split_nnzs[block_i]);
+    debug_d(mpi_meta_init.side);
 
-    sp = children[block_no] = Sparse::create(
-      ::split_row_no_max,
-      ::split_nnz_max,
+    sp = children[block_i] = Sparse::create(
+      ::mpi_meta_init.row_no_max,
+      ::mpi_meta_init.nnz_max,
       by_col ? 0 : first_incl, //first row
       by_col ? first_incl : 0, //first col
-      by_col ? side() : this_block_size, //row_no
-      by_col ? this_block_size : side(), //col_no
-      split_nnzs[block_no] //nnz
+      by_col ? side() : ::block_size(block_i), //row_no
+      by_col ? ::block_size(block_i) : side(), //col_no
+      split_nnzs[block_i] //nnz
     );
 
-    sp->block_no = block_no;
+    sp->block_no = block_i;
 
-    first_incl += this_block_size;
+    first_incl += ::block_size(block_i);
   }
 
   debug("partition data");
   SPFOR(this){
-    int block_no = which_block(side(), block_count, by_col ? it_col() : it_row());
-    sp = children[block_no];
-    //debug_d(block_no);
+    int block_i = which_block(by_col ? it_col() : it_row());
+    sp = children[block_i];
+    //debug_d(block_i);
     sp->insert(it_val(), it_col(), it_row());
 
     //assert(sp->it_val() == it_val());
@@ -137,5 +119,10 @@ FullSparse* FullSparse::create(
 
 int FullSparse::side(){
   assert(row_no == col_no);
+  assert(row_no == mpi_meta_init.side);
   return col_no;
+}
+
+FullSparse::~FullSparse(){
+  delete split_nnzs;
 }

@@ -7,6 +7,8 @@
 
 #ifdef DEBUG
 
+#include <assert.h>
+
 #define debug_s(arg) { fprintf(stderr, "%d  %s:%d in %s()  | %s=%s \n", mpi_rank, __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
 #define debug_d(arg) { fprintf(stderr, "%d  %s:%d in %s()  | %s=%d \n", mpi_rank, __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
 #define debug_f(arg) { fprintf(stderr, "%d  %s:%d in %s()  | %s=%0.2lf \n", mpi_rank, __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
@@ -21,14 +23,26 @@
 
 #endif
 
+#define ASSERTS \
+  assert(block_count > 0);
+
+
+struct Mpi_meta_init{
+  int row_no_max;
+  int nnz_max;
+  int side;
+};
+extern Mpi_meta_init mpi_meta_init;
+
 int MPI_Wait(MPI_Request* request);
 
-extern int mpi_meta_init[2];
-extern int mpi_meta_init_size;
-extern int &split_row_no_max;
-extern int &split_nnz_max;
 extern int mpi_rank;
 extern int num_processes;
+extern void init_block_count(bool by_col);
+extern int block_count;
+extern int block_size(int block_no);
+extern int first_side(bool get_col, bool by_col, int block_no);
+extern int repl_fact;
 
 int mpi_no(int);
 

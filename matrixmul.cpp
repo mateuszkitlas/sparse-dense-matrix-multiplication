@@ -1,8 +1,8 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <getopt.h>
 
 #include "densematgen.h"
+#include "dense.h"
 #include "sparse.h"
 #include "fullsparse.h"
 #include "common.h"
@@ -12,8 +12,6 @@ int main(int argc, char * argv[])
   int show_results = 0;
   int use_inner = 0;
   int gen_seed = -1;
-  int repl_fact = 1;
-  int &c = repl_fact;
 
   int option = -1;
 
@@ -53,6 +51,7 @@ int main(int argc, char * argv[])
         int row_no, col_no, nnz, nnz_max;
         fscanf(file_sparse, "%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
         assert(col_no == row_no);
+        mpi_meta_init.side = col_no;
 
         full_sparse = FullSparse::create(row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i)
@@ -85,7 +84,7 @@ int main(int argc, char * argv[])
     MPI_Finalize();
     return 3;
   }
-
+  init_block_count(by_col);
 
 
   //------------------------
@@ -96,12 +95,11 @@ int main(int argc, char * argv[])
   comm_start = MPI_Wtime();
   MPI_Request mpi_meta_init_req;
   if(mpi_rank == 0){
-    int block_count = num_processes;
 
-    full_sparse->init_split(by_col, block_count);
+    full_sparse->init_split(by_col);
 
     debug("coordinator ibcast");
-    MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
+    MPI_Ibcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
 
     Sparse** mini_sparses = full_sparse->split();
     full_sparse->free_csr();
@@ -128,22 +126,46 @@ int main(int argc, char * argv[])
     delete mini_sparses;
   } else {
     debug("waiting for broadcast from coordinator");
-    MPI_Ibcast(mpi_meta_init, mpi_meta_init_size, MPI_INT, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
+    MPI_Ibcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
     MPI_Wait(&mpi_meta_init_req);
     debug("got broadcast from coordinator");
-    my_sparse = Sparse::mpi_create(split_row_no_max, split_nnz_max);
+    my_sparse = Sparse::mpi_create();
     my_sparse->recv(0, mpi_no(0));
   }
 
 
-  sparses = new Sparse*[c];
+  sparses = new Sparse*[repl_fact];
   sparses[0] = my_sparse;
-  for(int ci = 1; ci<c; ci++){
-    sparses[ci] = Sparse::mpi_create(split_row_no_max, split_nnz_max);
+  for(int ci = 1; ci<repl_fact; ci++){
+    sparses[ci] = Sparse::mpi_create();
     sparses[ci]->recv( mpi_no(-ci), mpi_no(-ci) );
     my_sparse->send( mpi_no(ci) );
   }
-  for(int ci = 0; ci<c; ci++){
+
+  //------------------------
+  //---  dense inits
+  //------------------------
+
+  {
+    int my_block_no = mpi_no(0);
+    if(by_col)
+      assert((num_processes % repl_fact) == 0);
+    else
+      assert((num_processes % (repl_fact*repl_fact)) == 0);
+
+    int
+      row_no = by_col ? mpi_meta_init.side : block_size(my_block_no),
+      col_no = by_col ? block_size(my_block_no) : mpi_meta_init.side,
+      first_row = first_side(false, by_col, my_block_no),
+      first_col = first_side(true, by_col, my_block_no);
+    dense_b = new Dense(row_no, col_no, first_row, first_col, gen_seed);
+    dense_c = new Dense(row_no, col_no, first_row, first_col);
+  }
+
+
+
+
+  for(int ci = 0; ci<repl_fact; ci++){
     sparses[ci]->recv_wait();
     sparses[ci]->send_wait();
   }
@@ -161,10 +183,11 @@ int main(int argc, char * argv[])
   //------------------------
   //---  free A
   //------------------------
-  for(int ci = 0; ci<c; ci++)
+  for(int ci = 0; ci<repl_fact; ci++)
     sparses[ci]->free_csr();
   //my_sparse->print();
   delete sparses;
+  delete dense_b;
 
   if (show_results) 
   {
@@ -176,6 +199,8 @@ int main(int argc, char * argv[])
     // FIXME: replace the following line: count ge elements
     printf("54\n");
   }
+
+  delete dense_c;
 
 
   MPI_Finalize();

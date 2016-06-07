@@ -42,15 +42,15 @@ class Sparse {
   void insert(double v, int g_col, int g_row);
 
   size_t csr_size();
-  static Sparse* mpi_create(int row_no_max, int nnz_max){
+  static Sparse* mpi_create(){
     return create(
-        row_no_max,
-        nnz_max,
+        ::mpi_meta_init.row_no_max,
+        ::mpi_meta_init.nnz_max,
         -1,
         -1,
-        row_no_max,
+        ::mpi_meta_init.row_no_max,
         -1,
-        nnz_max);
+        ::mpi_meta_init.nnz_max);
   }
   static Sparse* create(
       int row_no_max,
@@ -63,11 +63,6 @@ class Sparse {
   Sparse(void* csr, int row_no_max, int nnz_max);
   void free_csr();
   int side(); //row_no; asserts row_no == col_no
-
-  int split_nnz_max(bool by_col, int block_count);
-  int split_row_no_max(bool by_col, int block_count);
-  Sparse** split(bool by_col, int block_count, int split_row_no_max, int split_nnz_max);
-
 
   //------------------------
   //---  MPI

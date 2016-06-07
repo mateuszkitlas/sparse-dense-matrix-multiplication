@@ -1,6 +1,5 @@
 #include "sparse.h"
 #include <stdlib.h>
-#include <assert.h>
 
 
 void Sparse::send(int rank){

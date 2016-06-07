@@ -1,6 +1,5 @@
 #include "sparse.h"
 #include <stdlib.h>
-#include <assert.h>
 #include "common.h"
 
 void Sparse::update_refs(){

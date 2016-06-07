@@ -3,11 +3,11 @@ CXXFLAGS= -Wall -c -O3 ${ARGS}
 LDFLAGS = -Wall -O3 ${ARGS}
 ALL     = matrixmul
 
-HEADERS = metgen.h sparse.h fullsparse.h common.h
+HEADERS = metgen.h sparse.h fullsparse.h common.h dense.h
 
 all: $(ALL)
 
-$(ALL): %: %.o densematgen.o sparse.o sparse_mpi.o fullsparse.o common.o
+$(ALL): %: %.o densematgen.o sparse.o sparse_mpi.o fullsparse.o common.o dense.o
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 %.o: %.cpp $(HEADERS) Makefile
