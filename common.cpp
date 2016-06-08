@@ -46,3 +46,14 @@ int first_side(bool get_col, bool by_col, int block_no){
   else
     return block_no * bigger_block_size;
 }
+
+int which_block(int matrix_i){
+  int &side = mpi_meta_init.side;
+  int bigger_blocks_count = side % block_count;
+  int bigger_block_size = block_size(0);
+  int i2 = matrix_i - bigger_block_size * bigger_blocks_count;
+  if(i2 < 0)
+    return matrix_i / bigger_block_size;
+  else
+    return bigger_blocks_count + i2 / (bigger_block_size - 1);
+}

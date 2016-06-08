@@ -34,6 +34,24 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   //print();
 }
 
+
+Dense::Dense(bool by_col, int block_no) : Dense(
+    by_col ? mpi_meta_init.side : block_size(block_no),
+    by_col ? block_size(block_no) : mpi_meta_init.side,
+    first_side(false, by_col, block_no),
+    first_side(true, by_col, block_no)
+  ){
+  if(by_col){
+    assert(first_row == 0);
+    assert(row_no == mpi_meta_init.side);
+  }
+  else {
+    assert(first_col == 0);
+    assert(col_no == mpi_meta_init.side);
+  }
+}
+
+
 Dense::~Dense(){
   delete data;
 }
@@ -67,17 +85,11 @@ int Dense::my_col(int g_col){
   int result = g_col - first_col;
   assert(result < col_no);
   assert(first_col <= g_col);
-  /*if(result >= col_no){
-    debug_s(&name);
-    debug_d(first_col);
-    debug_d(g_col);
-    debug_d(result);
-    debug_d(col_no);
-  }*/
   return result;
 }
 
 void Dense::print(){
+#ifdef DEBUG
   char x[10000];
   sprintf(x, "--| %c %d |-----\n", name, mpi_no(0));
   for(int r=0; r<row_no; ++r){
@@ -88,5 +100,16 @@ void Dense::print(){
   }
   sprintf(x, "%s-----------\n", x);
   fprintf(stderr, "%s", x);
+#endif
 }
 
+void Dense::send(){
+  MPI_Request r;
+  MPI_Isend(data, row_no*col_no, MPI_DOUBLE, 0, 2000, MPI_COMM_WORLD, &r);
+  MPI_Wait(&r);
+  debug("done");
+}
+
+void Dense::recv(int rank, MPI_Request* mpi_recv){
+  MPI_Irecv(data, row_no*col_no, MPI_DOUBLE, rank, 2000, MPI_COMM_WORLD, mpi_recv);
+}

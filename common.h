@@ -4,10 +4,9 @@
 #include <stdio.h>
 #include <cstdio>
 #include <mpi.h>
+#include <assert.h>
 
 #ifdef DEBUG
-
-#include <assert.h>
 
 #define debug_s(arg) { fprintf(stderr, "%d  %s:%d in %s()  | %s=%s \n", mpi_rank, __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
 #define debug_d(arg) { fprintf(stderr, "%d  %s:%d in %s()  | %s=%d \n", mpi_rank, __FILE__, __LINE__, __FUNCTION__, #arg, arg); }
@@ -17,9 +16,10 @@
 
 #else
 
-#define debug_s(arg) {;};
-#define debug_d(arg) {;};
-#define debug(arg) {;};
+#define debug_s(arg) ;
+#define debug_d(arg) ;
+#define debug(arg) ;
+#define NDEBUG
 
 #endif
 
@@ -43,6 +43,7 @@ extern int block_count;
 extern int block_size(int block_no);
 extern int first_side(bool get_col, bool by_col, int block_no);
 extern int repl_fact;
+extern int which_block(int matrix_i);
 
 int mpi_no(int);
 

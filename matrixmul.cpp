@@ -158,30 +158,26 @@ int main(int argc, char * argv[])
   //------------------------
   int my_block_no = mpi_no(0);
 
-  {
-    if(by_col)
-      assert((num_processes % repl_fact) == 0);
-    else
-      assert((num_processes % (repl_fact*repl_fact)) == 0);
+  if(by_col)
+    assert((num_processes % repl_fact) == 0);
+  else
+    assert((num_processes % (repl_fact*repl_fact)) == 0);
 
-    //debug_d(my_block_no);
-    //debug_d(block_size(my_block_no));
-    int
-      row_no = by_col ? mpi_meta_init.side : block_size(my_block_no),
-      col_no = by_col ? block_size(my_block_no) : mpi_meta_init.side,
-      first_row = first_side(false, by_col, my_block_no),
-      first_col = first_side(true, by_col, my_block_no);
-    if(by_col){
-      assert(first_row == 0);
-      assert(row_no == mpi_meta_init.side);
-    }
-    else {
-      assert(first_col == 0);
-      assert(col_no == mpi_meta_init.side);
-    }
-    dense_b = new Dense(row_no, col_no, first_row, first_col, gen_seed);
-    dense_c = new Dense(row_no, col_no, first_row, first_col);
+  int
+    dense_row_no = by_col ? mpi_meta_init.side : block_size(my_block_no),
+    dense_col_no = by_col ? block_size(my_block_no) : mpi_meta_init.side,
+    dense_first_row = first_side(false, by_col, my_block_no),
+    dense_first_col = first_side(true, by_col, my_block_no);
+  if(by_col){
+    assert(dense_first_row == 0);
+    assert(dense_row_no == mpi_meta_init.side);
   }
+  else {
+    assert(dense_first_col == 0);
+    assert(dense_col_no == mpi_meta_init.side);
+  }
+  dense_b = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col, gen_seed);
+  dense_c = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col);
 
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
@@ -219,11 +215,9 @@ int main(int argc, char * argv[])
           sp->send();
         multiply(sp, dense_b, dense_c);
         done_blocks++;
-        //if(mpi_rank==0 || mpi_rank==2){
-          printf("%d | multiply [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
-        //}
-        //debug_d(ci);
-        //debug_d(sp->block_no);
+#ifdef DEBUG
+        printf("%d | multiply [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
+#endif
         sp->done_multiplication = true;
         done_nothing = 0;
       } else done_nothing++;
@@ -237,9 +231,9 @@ int main(int argc, char * argv[])
           sp->recv();
         done_nothing = 0;
         sp->done_multiplication = false;
-        //if(mpi_rank==0 || mpi_rank==2){
-          printf("%d | receive [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
-        //}
+#ifdef DEBUG
+        printf("%d | receive [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
+#endif
       }
     } else done_nothing++;
     ci = (ci+1) % repl_fact;
@@ -247,7 +241,7 @@ int main(int argc, char * argv[])
   sparses[ci]->print();
 
   //dense_b->print();
-  dense_c->print();
+  //dense_c->print();
 
   for(int ci=0; ci<repl_fact; ++ci){
     Sparse *sp = sparses[ci];
@@ -268,10 +262,36 @@ int main(int argc, char * argv[])
   delete sparses;
   delete dense_b;
 
-  if (show_results) 
+  if (show_results)
   {
-    // FIXME: replace the following line: print the whole result matrix
-    printf("1 1\n42\n");
+    debug("show results");
+    if(mpi_rank == 0){
+      Dense **whole_c = new Dense*[block_count];
+      whole_c[0] = dense_c;
+      MPI_Request *reqs = new MPI_Request[block_count-1];
+      for(int block_i=1; block_i < block_count; ++block_i){
+        Dense *den = new Dense(by_col, block_i);
+        whole_c[block_i] = den;
+        den->recv(block_i, &reqs[block_i-1]);
+      }
+      MPI_Waitall(block_count-1, reqs, MPI_STATUSES_IGNORE);
+      delete reqs;
+      int &side = mpi_meta_init.side;
+
+      printf("%d %d\n", side, side);
+      for(int r=0; r<side; ++r){
+        for(int c=0; c<side; ++c){
+          int block_i = which_block(by_col ? c : r);
+          Dense *den = whole_c[block_i];
+          printf("%*.5lf ", *den->val(r,c), 10);
+        }
+        printf("\n");
+      }
+      delete whole_c;
+    } else {
+      dense_c->send();
+      delete dense_c;
+    }
   }
   if (count_ge)
   {
@@ -279,7 +299,6 @@ int main(int argc, char * argv[])
     printf("54\n");
   }
 
-  delete dense_c;
 
 
   MPI_Finalize();

@@ -7,17 +7,6 @@ inline int max_block_size(){ return block_size(0); }
 
 inline int min_block_size(){ return block_size(block_count -1 ); }
 
-inline int which_block(int matrix_i){
-  int &side = mpi_meta_init.side;
-  int bigger_blocks_count = side % block_count;
-  int bigger_block_size = block_size(0);
-  int i2 = matrix_i - bigger_block_size * bigger_blocks_count;
-  if(i2 < 0)
-    return matrix_i / bigger_block_size;
-  else
-    return bigger_blocks_count + i2 / (bigger_block_size - 1);
-}
-
 void FullSparse::init_split(bool by_col_){
   ASSERTS;
   this->by_col = by_col_;
