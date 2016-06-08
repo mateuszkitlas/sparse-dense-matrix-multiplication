@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #make clean && make ARGS="-DDEBUG -DIDENTITY_MATRIX"
-#make clean && make ARGS="-DDEBUG"
-make clean && make
+make clean && make ARGS="-DDEBUG"
+#make clean && make
 if [[ $? == 0 ]] ; then echo ""; else exit ; fi
 
 
@@ -22,7 +22,6 @@ INFILE=exported_tests/sparse05_000${Y}_$Z
 OUTFILE=exported_tests/result_${X}_000${Y}_$Z
 BFILE=exported_tests/matrix01_000${Y}_$A
 
-#cat $INFILE
-
-diff <(mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v) $OUTFILE
-#cat $BFILE
+#diff <(mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v) $OUTFILE
+mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v
+cat $OUTFILE
