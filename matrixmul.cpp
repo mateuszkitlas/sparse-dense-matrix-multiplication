@@ -141,25 +141,6 @@ int main(int argc, char * argv[])
   }
 
 
-  sparses = new Sparse*[repl_fact];
-  my_sparse->recv_wait();
-  assert(my_sparse->recv_ready());
-  debug("has my_sparse");
-  //my_sparse->print();
-  sparses[0] = my_sparse;
-  for(int ci = 1; ci<repl_fact; ci++){
-    sparses[ci] = Sparse::mpi_create();
-    sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
-    my_sparse->_send(mpi_no(-ci));
-  }
-
-
-  for(int ci = 0; ci<repl_fact; ci++){
-    sparses[ci]->recv_wait();
-    sparses[ci]->send_wait();
-  }
-  debug("done scatter");
-
   //------------------------
   //---  dense inits
   //------------------------
@@ -186,14 +167,43 @@ int main(int argc, char * argv[])
 
   dense_b = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col, gen_seed);
 
+
+
+
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
+
 
   //------------------------
   //---  compute
   //------------------------
+
+
+  sparses = new Sparse*[repl_fact];
+  my_sparse->recv_wait();
+  assert(my_sparse->recv_ready());
+  debug("has my_sparse");
+  //my_sparse->print();
+  sparses[0] = my_sparse;
+  for(int ci = 1; ci<repl_fact; ci++){
+    sparses[ci] = Sparse::mpi_create();
+    sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
+    my_sparse->_send(mpi_no(-ci));
+  }
+
+
+  for(int ci = 0; ci<repl_fact; ci++){
+    sparses[ci]->recv_wait();
+    sparses[ci]->send_wait();
+  }
+  debug("done scatter");
+
   comp_start = MPI_Wtime();
   MPI_Barrier(MPI_COMM_WORLD);
+
+  //------------------------
+  //---  compute
+  //------------------------
 
 
   for(int e=0; e<exponent; ++e){
