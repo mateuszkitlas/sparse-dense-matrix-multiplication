@@ -14,6 +14,14 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col){
 #endif
 }
 
+int Dense::ge_elements(double ge){
+  int n=0;
+  for(int r=0; r<row_no; ++r)
+    for(int c=0; c<col_no; ++c)
+      n += *my_val(r,c) >= ge;
+  return n;
+}
+
 Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   data = new double[row_no*col_no];
   this->row_no = row_no;

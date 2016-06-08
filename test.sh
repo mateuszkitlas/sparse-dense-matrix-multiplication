@@ -24,6 +24,7 @@ for OUTFILE in `ls exported_tests/result*` ; do
 
   echo -n "test $INFILE $X... "
 
+  mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -ge 1
   mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v 2>/dev/null > out.txt
   if [[ $? == 0 ]] ; then
     python diff_numbers.py out.txt $OUTFILE

@@ -28,6 +28,7 @@ class Dense {
 
     void send();
     void recv(int rank, MPI_Request* mpi_recv);
+    int ge_elements(double ge);
 
   private:
 

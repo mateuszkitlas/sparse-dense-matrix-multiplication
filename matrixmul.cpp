@@ -281,8 +281,11 @@ int main(int argc, char * argv[])
   }
   if (count_ge)
   {
-    // FIXME: replace the following line: count ge elements
-    printf("54\n");
+    int my_ge_elements = dense_c->ge_elements(ge_element);
+    int ge_elements = 0;
+    MPI_Reduce(&my_ge_elements, &ge_elements, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if(mpi_rank == 0)
+      printf("%d\n", ge_elements);
   }
   //------------------------
   //---  free mem
