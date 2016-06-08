@@ -197,7 +197,7 @@ int main(int argc, char * argv[])
 
 
   for(int e=0; e<exponent; ++e){
-    dense_c = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col);
+    dense_c = new Dense(by_col, my_block_no);
     int ci=0;
     int done_blocks=0;
     int done_nothing=0;
