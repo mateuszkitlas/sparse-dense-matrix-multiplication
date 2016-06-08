@@ -183,8 +183,8 @@ int main(int argc, char * argv[])
     assert(dense_first_col == 0);
     assert(dense_col_no == mpi_meta_init.side);
   }
+
   dense_b = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col, gen_seed);
-  dense_c = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col);
 
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
@@ -196,29 +196,33 @@ int main(int argc, char * argv[])
   MPI_Barrier(MPI_COMM_WORLD);
 
 
-  int ci=0;
-  int done_blocks=0;
-  int done_nothing=0;
-  int sparse_cycles = block_count / repl_fact * exponent;
-  int blocks_todo = sparse_cycles * repl_fact;
+  for(int e=0; e<exponent; ++e){
+    dense_c = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col);
+    int ci=0;
+    int done_blocks=0;
+    int done_nothing=0;
+    int sparse_cycles = block_count / repl_fact;
 
-  int *cycles_done = new int[repl_fact]();
+    int *cycles_done = new int[repl_fact]();
 
-  while(done_blocks < blocks_todo){
-    Sparse *sp = sparses[ci];
-    sp->recv_wait();
-    sp->send();
-    multiply(sp, dense_b, dense_c);
-    if(++cycles_done[ci] < sparse_cycles){
-      sp->send_wait();
-      sp->recv();
-    } else {
-      assert(sp->recv_ready());
+    while(done_blocks < block_count){
+      Sparse *sp = sparses[ci];
+      sp->recv_wait();
+      sp->send();
+      multiply(sp, dense_b, dense_c);
+      if(++cycles_done[ci] < sparse_cycles){
+        sp->send_wait();
+        sp->recv();
+      } else {
+        assert(sp->recv_ready());
+      }
+      ci = (ci+1) % repl_fact;
+      done_blocks++;
     }
-    ci = (ci+1) % repl_fact;
-    done_blocks++;
+    delete cycles_done;
+    delete dense_b;
+    dense_b = dense_c;
   }
-  delete cycles_done;
 
   comp_end = MPI_Wtime();
 
@@ -281,7 +285,7 @@ int main(int argc, char * argv[])
     sp->free_csr();
   }
   delete sparses;
-  delete dense_b;
+  //delete dense_b;
   //------------------------
 
 
