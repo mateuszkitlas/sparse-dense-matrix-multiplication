@@ -101,8 +101,7 @@ void Sparse::printA(char* x){
     }
     sprintf(x, "%s\n", x);
   }
-  if(block_no != -1)
-    assert(end());
+  assert(end());
 }
 
 void Sparse::print(){
@@ -143,17 +142,41 @@ void Sparse::begin(){
   iterIA = 0;
 }
 
+void Sparse::test(){
+#ifdef IDENTITY_MATRIX
+  int *per_row = new int[row_no](), *per_col = new int[col_no]();
+  SPFOR(this){
+    per_row[it_row()]++;
+    per_col[it_col()]++;
+  }
+  assert(IA[row_no-1]>=IA[0]);
+  for(int ia=1; ia<row_no; ia++)
+    assert(IA[ia] - IA[ia-1] == per_row[ia]);
+  for(int ja=0; ja<nnz; ja++)
+    per_col[JA[ja]]--;
+  for(int c=0; c<col_no; ++c)
+    assert(per_col[c] == 0);
+#endif
+}
+
 int Sparse::it_row(){
   while(iterA >= IA[iterIA])
     ++iterIA;
-  return iterIA-1;
+  return iterIA;
 }
+void Sparse::done_insert(){
+  for(; iterIA<row_no; ++iterIA){
+    IA[iterIA + 1] = IA[iterIA];
+  }
+  begin();
+}
+
 void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this is child matrix
   //debug_s("inserting");
   JA[iterA] = g_col - first_col;
   A[iterA] = v;
 
-  int last_row = iterIA-1;
+  int last_row = iterIA;
   //debug_d(last_row);
   int new_row = g_row - first_row;
   for(int i=last_row; i<new_row; ++i){

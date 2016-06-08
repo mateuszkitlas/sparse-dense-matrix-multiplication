@@ -50,6 +50,7 @@ class Sparse {
 
 
   void insert(double v, int g_col, int g_row);
+  void done_insert();
 
   size_t csr_size();
   static Sparse* mpi_create(){
@@ -73,6 +74,7 @@ class Sparse {
   Sparse(void* csr, int row_no_max, int nnz_max);
   void free_csr();
   int side(); //row_no; asserts row_no == col_no
+  void test();
 
   //------------------------
   //---  MPI

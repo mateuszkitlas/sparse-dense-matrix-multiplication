@@ -37,8 +37,8 @@ Sparse** FullSparse::split(){
     sp = children[block_i] = Sparse::create(
       ::mpi_meta_init.row_no_max,
       ::mpi_meta_init.nnz_max,
-      by_col ? 0 : first_incl, //first row
-      by_col ? first_incl : 0, //first col
+      first_side(false, by_col, block_i), //first row
+      first_side(true, by_col, block_i), //first col
       by_col ? side() : ::block_size(block_i), //row_no
       by_col ? ::block_size(block_i) : side(), //col_no
       split_nnzs[block_i] //nnz
@@ -65,6 +65,8 @@ Sparse** FullSparse::split(){
     //debug_d(sp->nnz);
 
   }
+  for(int block_i=0; block_i<block_count; ++block_i)
+    children[block_i]->done_insert();
   return children;
 }
 

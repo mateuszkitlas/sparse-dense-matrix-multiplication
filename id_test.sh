@@ -5,7 +5,7 @@ PASS=0;
 FAIL=0;
 
 C=$1
-let NP="$C*2"
+let NP="$C*3"
 
 make clean && make ARGS="-DIDENTITY_MATRIX"
 if [[ $? == 0 ]] ; then echo ""; else exit ; fi

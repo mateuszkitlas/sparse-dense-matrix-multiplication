@@ -57,7 +57,8 @@ int main(int argc, char * argv[])
         full_sparse = FullSparse::create(row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%lf", &full_sparse->A[i]);
-        for(int i=0; i<(row_no+1); ++i)
+        fscanf(file_sparse, "%*d");
+        for(int i=0; i<row_no; ++i)
           fscanf(file_sparse, "%d", &full_sparse->IA[i]);
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
@@ -104,6 +105,9 @@ int main(int argc, char * argv[])
 
     Sparse** mini_sparses = full_sparse->split();
     full_sparse->print();
+    full_sparse->test();
+
+
 #ifndef IDENTITY_MATRIX
     full_sparse->free_csr();
     delete full_sparse;
@@ -271,6 +275,7 @@ int main(int argc, char * argv[])
   //------------------------
   for(int ci=0; ci<repl_fact; ++ci){
     Sparse *sp = sparses[ci];
+    sp->test();
     if(!sp->send_ready())
       sp->send_wait();
     sp->free_csr();

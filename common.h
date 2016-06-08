@@ -27,6 +27,11 @@
   assert(block_count > 0);
 
 
+#ifdef IDENTITY_MATRIX
+#undef NDEBUG
+#endif
+
+
 struct Mpi_meta_init{
   int row_no_max;
   int nnz_max;
