@@ -101,13 +101,14 @@ void Sparse::printA(char* x){
     }
     sprintf(x, "%s\n", x);
   }
-  assert(end());
+  if(block_no != -1)
+    assert(end());
 }
 
 void Sparse::print(){
 #ifdef DEBUG
-  /*
   char x[10000];
+  
   sprintf(x, "\
 %d   block_no = %d\n\
     first_row = %d\n\
@@ -131,9 +132,9 @@ mpi_rank, block_no,
   for(int i=0; i<=row_no; ++i)
     sprintf(x, "%s%d ", x, IA[i]);
   sprintf(x, "%s\n", x);
+  
   printA(x);
-  fprintf(stderr, "%s\n", x);
-  */
+  fprintf(stderr, "\n%s\n", x);
 #endif
 }
 

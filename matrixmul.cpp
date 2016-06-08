@@ -62,7 +62,7 @@ int main(int argc, char * argv[])
         for(int i=0; i<nnz; ++i)
           fscanf(file_sparse, "%d", &full_sparse->JA[i]);
         debug_s("full_sparse loaded");
-        full_sparse->print();
+        //full_sparse->print();
       }
       break;
     case 'c': repl_fact = atoi(optarg);
@@ -103,9 +103,11 @@ int main(int argc, char * argv[])
     MPI_Ibcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
 
     Sparse** mini_sparses = full_sparse->split();
+    full_sparse->print();
+#ifndef IDENTITY_MATRIX
     full_sparse->free_csr();
     delete full_sparse;
-
+#endif
     my_sparse = mini_sparses[0];
     my_sparse->post_async_recv(0, 0);
     //sparse->print();
@@ -137,6 +139,7 @@ int main(int argc, char * argv[])
 
   sparses = new Sparse*[repl_fact];
   my_sparse->recv_wait();
+  assert(my_sparse->recv_ready());
   debug("has my_sparse");
   //my_sparse->print();
   sparses[0] = my_sparse;
@@ -195,72 +198,25 @@ int main(int argc, char * argv[])
   int sparse_cycles = block_count / repl_fact * exponent;
   int blocks_todo = sparse_cycles * repl_fact;
 
+  int *cycles_done = new int[repl_fact]();
+
   while(done_blocks < blocks_todo){
     Sparse *sp = sparses[ci];
-    assert(sp->recv_counter>0);
-    bool wait = false;
-    if(done_nothing >= repl_fact*2){
-      wait = true;
-      if(mpi_rank==0){
-        //printf("done_blocks=%d, sc=%d, rc=%d\n", done_blocks, sp->send_counter, sp->recv_counter);
-        //printf("i will wait [%d] for block_no=%d\n", ci, sp->block_no);
-      }
-    }
-    if(!sp->done_multiplication){
-      if(wait)
-        sp->recv_wait();
-      if(sp->recv_ready()){
-        wait = false;
-        if(sp->send_counter < sparse_cycles)
-          sp->send();
-        multiply(sp, dense_b, dense_c);
-        done_blocks++;
-#ifdef DEBUG
-        printf("%d | multiply [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
-#endif
-        sp->done_multiplication = true;
-        done_nothing = 0;
-      } else done_nothing++;
-    } else done_nothing++;
-    if(sp->done_multiplication && sp->send_ready()){
-      if(wait)
-        sp->send_wait();
-      if(sp->send_ready()){
-        wait = false;
-        if(sp->recv_counter < sparse_cycles)
-          sp->recv();
-        done_nothing = 0;
-        sp->done_multiplication = false;
-#ifdef DEBUG
-        printf("%d | receive [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
-#endif
-      }
-    } else done_nothing++;
-    ci = (ci+1) % repl_fact;
-  }
-  sparses[ci]->print();
-
-  //dense_b->print();
-  //dense_c->print();
-
-  for(int ci=0; ci<repl_fact; ++ci){
-    Sparse *sp = sparses[ci];
-    debug_d(sp->block_no);
-    if(!sp->send_ready())
+    sp->recv_wait();
+    sp->send();
+    multiply(sp, dense_b, dense_c);
+    if(++cycles_done[ci] < sparse_cycles){
       sp->send_wait();
+      sp->recv();
+    } else {
+      assert(sp->recv_ready());
+    }
+    ci = (ci+1) % repl_fact;
+    done_blocks++;
   }
+  delete cycles_done;
 
   comp_end = MPI_Wtime();
-
-
-  //------------------------
-  //---  free A
-  //------------------------
-  for(int ci = 0; ci<repl_fact; ci++)
-    sparses[ci]->free_csr();
-  //my_sparse->print();
-  delete sparses;
-  delete dense_b;
 
   if (show_results)
   {
@@ -278,6 +234,7 @@ int main(int argc, char * argv[])
       delete reqs;
       int &side = mpi_meta_init.side;
 
+#ifndef IDENTITY_MATRIX
       printf("%d %d\n", side, side);
       for(int r=0; r<side; ++r){
         for(int c=0; c<side; ++c){
@@ -287,6 +244,17 @@ int main(int argc, char * argv[])
         }
         printf("\n");
       }
+#else
+      Sparse *s = full_sparse;
+      SPFOR(s){
+        int block_i = which_block(by_col ? s->col() : s->row());
+        Dense *den = whole_c[block_i];
+        //fprintf(stderr, "%lf %lf %d [%d,%d]\n", *den->val(s->row(),s->col()), s->val(), block_i, s->row(), s->col());
+        assert(*den->val(s->row(),s->col()) - s->val() < 0.01);
+      }
+      //fprintf(stderr, "cokolwiek\n");
+      delete s;
+#endif
       delete whole_c;
     } else {
       dense_c->send();
@@ -298,6 +266,18 @@ int main(int argc, char * argv[])
     // FIXME: replace the following line: count ge elements
     printf("54\n");
   }
+  //------------------------
+  //---  free mem
+  //------------------------
+  for(int ci=0; ci<repl_fact; ++ci){
+    Sparse *sp = sparses[ci];
+    if(!sp->send_ready())
+      sp->send_wait();
+    sp->free_csr();
+  }
+  delete sparses;
+  delete dense_b;
+  //------------------------
 
 
 

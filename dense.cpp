@@ -83,6 +83,8 @@ int Dense::my_row(int g_row){
 
 int Dense::my_col(int g_col){
   int result = g_col - first_col;
+  //if(result >= col_no)
+  //  printf("%d %d %d\n", g_col, first_col, col_no);
   assert(result < col_no);
   assert(first_col <= g_col);
   return result;

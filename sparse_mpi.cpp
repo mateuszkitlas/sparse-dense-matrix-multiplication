@@ -12,7 +12,7 @@ void Sparse::recv(){
 
 void Sparse::_send(int rank){
 #ifdef DEBUG
-  printf("send %d -> %d, block_no=%d\n", mpi_rank, rank, block_no);
+  //printf("send %d -> %d, block_no=%d\n", mpi_rank, rank, block_no);
 #endif
   assert(block_no >= 0);
   MPI_Isend(csr, csr_size(), MPI_BYTE, rank, 1000+block_no, MPI_COMM_WORLD, &send_req);
