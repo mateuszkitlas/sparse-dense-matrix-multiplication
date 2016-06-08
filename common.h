@@ -44,6 +44,8 @@ extern int block_size(int block_no);
 extern int first_side(bool get_col, bool by_col, int block_no);
 extern int repl_fact;
 extern int which_block(int matrix_i);
+extern int max_block_size();
+extern int min_block_size();
 
 int mpi_no(int);
 

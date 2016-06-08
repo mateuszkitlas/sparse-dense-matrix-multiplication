@@ -107,7 +107,7 @@ void Sparse::printA(char* x){
 
 void Sparse::print(){
 #ifdef DEBUG
-  char x[10000];
+  char x[100000];
   
   sprintf(x, "\
 %d   block_no = %d\n\

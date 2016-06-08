@@ -38,8 +38,8 @@ int first_side(bool get_col, bool by_col, int block_no){
     if(get_col) //first_col
       return 0;
 
-  int bigger_block_size = block_size(0);
-  int smaller_block_size = bigger_block_size - 1;
+  int bigger_block_size = max_block_size();
+  int smaller_block_size = min_block_size();
   int smaller_blocks_count = block_no - side % block_count;
   if(smaller_blocks_count > 0)
     return smaller_blocks_count * smaller_block_size + bigger_block_size * (side % block_count);
@@ -47,13 +47,32 @@ int first_side(bool get_col, bool by_col, int block_no){
     return block_no * bigger_block_size;
 }
 
+int max_block_size(){
+  int &side = mpi_meta_init.side;
+  return (side % block_count > 0) + side / block_count;
+}
+
+int min_block_size(){
+  int &side = mpi_meta_init.side;
+  return side / block_count;
+}
+
 int which_block(int matrix_i){
   int &side = mpi_meta_init.side;
   int bigger_blocks_count = side % block_count;
-  int bigger_block_size = block_size(0);
-  int i2 = matrix_i - bigger_block_size * bigger_blocks_count;
+  int i2 = matrix_i - max_block_size() * bigger_blocks_count;
+#ifdef DEBUG
+  int x;
   if(i2 < 0)
-    return matrix_i / bigger_block_size;
+     x = matrix_i / max_block_size();
   else
-    return bigger_blocks_count + i2 / (bigger_block_size - 1);
+     x = bigger_blocks_count + i2 / min_block_size();
+  //fprintf(stderr, 
+  //    "side %d, bigger blocks count%d, block_count %d, max_block_size() %d, min_block_size() %d, matrix_i %d, i2=%d, result=%d\n",
+  //    side, bigger_blocks_count, block_count, max_block_size(), min_block_size(), matrix_i, i2, x);
+#endif
+  if(i2 < 0)
+    return matrix_i / max_block_size();
+  else
+    return bigger_blocks_count + i2 / min_block_size();
 }

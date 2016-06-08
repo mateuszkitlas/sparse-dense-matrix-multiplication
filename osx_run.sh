@@ -10,7 +10,7 @@ let NP="$C*2"
 
 X=1
 Z=000
-Y=10
+Y=64
 
 
 A=$(ls -1 exported_tests/matrix* | sed -E "s/(.*)_(.*)_(.*)/\3/g" | head -n $(let Z1="$Z+1" ; echo $Z1) | tail -n 1)

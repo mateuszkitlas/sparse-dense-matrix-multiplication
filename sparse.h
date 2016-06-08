@@ -97,7 +97,6 @@ class Sparse {
 
   int block_no;
 
-  private:
   int iterA, iterIA;
   protected:
   int nnz_max, row_no_max;

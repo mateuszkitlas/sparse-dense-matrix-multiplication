@@ -3,10 +3,6 @@
 #include <stdlib.h>
 
 
-inline int max_block_size(){ return block_size(0); }
-
-inline int min_block_size(){ return block_size(block_count -1 ); }
-
 void FullSparse::init_split(bool by_col_){
   ASSERTS;
   this->by_col = by_col_;
@@ -57,8 +53,10 @@ Sparse** FullSparse::split(){
   SPFOR(this){
     int block_i = which_block(by_col ? it_col() : it_row());
     sp = children[block_i];
-    //debug_d(block_i);
     sp->insert(it_val(), it_col(), it_row());
+#ifdef DEBUG
+    //fprintf(stderr, "[%d,%d] block_i=%d\n nnzs=%d iterA=%d\n", it_row(), it_col(), block_i, split_nnzs[block_i], sp->iterA);
+#endif
 
     //assert(sp->it_val() == it_val());
     //assert(sp->it_col() <= it_col());
