@@ -26,7 +26,7 @@ for Y in 10 64 ; do
 
       mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v 2>/dev/null > out.txt
 
-      diff -w out.txt $OUTFILE >/dev/null
+      python diff_numbers.py out.txt $OUTFILE
 
       if [[ $? == 0 ]] ; then
         let PASS="$PASS+1"
