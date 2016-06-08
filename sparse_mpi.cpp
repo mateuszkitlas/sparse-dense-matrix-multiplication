@@ -2,14 +2,23 @@
 #include <stdlib.h>
 
 
-void Sparse::send(int rank){
+void Sparse::send(){
+  _send( mpi_no(-repl_fact) );
+}
+
+void Sparse::recv(){
+  _recv( mpi_no(repl_fact), (block_no + repl_fact) % block_count );
+}
+
+void Sparse::_send(int rank){
+  printf("send %d -> %d, block_no=%d\n", mpi_rank, rank, block_no);
   assert(block_no >= 0);
   MPI_Isend(csr, csr_size(), MPI_BYTE, rank, 1000+block_no, MPI_COMM_WORLD, &send_req);
   assert(send_req != MPI_REQUEST_NULL);
   send_counter++;
 }
 
-void Sparse::recv(int rank, int block_no){
+void Sparse::_recv(int rank, int block_no){
   assert(block_no >= 0);
   MPI_Irecv(
       csr,
@@ -17,8 +26,11 @@ void Sparse::recv(int rank, int block_no){
       MPI_BYTE,
       rank, 1000+block_no, MPI_COMM_WORLD, &recv_req);
   //assert(recv_req != MPI_REQUEST_NULL);
+  post_async_recv(rank, block_no);
+}
+
+void Sparse::post_async_recv(int rank, int block_no){
   this->block_no = block_no;
-  this->rank_from = rank;
   recv_counter++;
   done_multiplication = false;
 }
@@ -66,12 +78,4 @@ void Sparse::send_wait(){
     MPI_Wait(&send_req);
     send_ready();
   }
-}
-
-void Sparse::send(){
-  send( mpi_no(rank_from - repl_fact) );
-}
-
-void Sparse::recv(){
-  recv( mpi_no(rank_from + repl_fact), (block_no + repl_fact) % block_count );
 }

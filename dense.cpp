@@ -21,11 +21,17 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   this->first_row = first_row;
   this->first_col = first_col;
   for(int r=0; r<row_no; ++r)
-    for(int c=0; c<col_no; ++c)
+    for(int c=0; c<col_no; ++c){
+#ifdef IDENTITY_MATRIX
+      *my_val(r,c) = r+first_row==c+first_col;
+#else
       *my_val(r,c) = generate_double(seed, r + first_row, c + first_col);
+#endif
+    }
 #ifdef DEBUG
   this->name = 'b';
 #endif
+  //print();
 }
 
 Dense::~Dense(){

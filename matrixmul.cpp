@@ -107,11 +107,12 @@ int main(int argc, char * argv[])
     delete full_sparse;
 
     my_sparse = mini_sparses[0];
+    my_sparse->post_async_recv(0, 0);
     //sparse->print();
     for(int block_no=1; block_no<block_count; ++block_no){
       Sparse *sp = mini_sparses[block_no];
       //sp->print();
-      sp->send(block_no);
+      sp->_send(block_no);
     }
 
     debug("coordinator broadcast wait");
@@ -130,7 +131,7 @@ int main(int argc, char * argv[])
     MPI_Wait(&mpi_meta_init_req);
     debug("got broadcast from coordinator");
     my_sparse = Sparse::mpi_create();
-    my_sparse->recv(0, mpi_no(0));
+    my_sparse->_recv(0, mpi_no(0));
   }
 
 
@@ -141,9 +142,16 @@ int main(int argc, char * argv[])
   sparses[0] = my_sparse;
   for(int ci = 1; ci<repl_fact; ci++){
     sparses[ci] = Sparse::mpi_create();
-    sparses[ci]->recv( mpi_no(ci), mpi_no(ci) );
-    my_sparse->send( mpi_no(-ci) );
+    sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
+    my_sparse->_send(mpi_no(-ci));
   }
+
+
+  for(int ci = 0; ci<repl_fact; ci++){
+    sparses[ci]->recv_wait();
+    sparses[ci]->send_wait();
+  }
+  debug("done scatter");
 
   //------------------------
   //---  dense inits
@@ -175,13 +183,6 @@ int main(int argc, char * argv[])
     dense_c = new Dense(row_no, col_no, first_row, first_col);
   }
 
-
-
-
-  /*for(int ci = 0; ci<repl_fact; ci++){
-    sparses[ci]->recv_wait();
-    sparses[ci]->send_wait();
-  }*/
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
 
@@ -195,31 +196,57 @@ int main(int argc, char * argv[])
   int ci=0;
   int done_blocks=0;
   int done_nothing=0;
-  int blocks_todo = block_count * exponent;
+  int sparse_cycles = block_count / repl_fact * exponent;
+  int blocks_todo = sparse_cycles * repl_fact;
 
   while(done_blocks < blocks_todo){
     Sparse *sp = sparses[ci];
+    assert(sp->recv_counter>0);
     bool wait = false;
-    if(done_nothing >= repl_fact*2)
+    if(done_nothing >= repl_fact*2){
       wait = true;
-    if(!sp->done_multiplication && sp->send_counter < num_processes * exponent){
-      sp->recv_wait();
+      if(mpi_rank==0){
+        //printf("done_blocks=%d, sc=%d, rc=%d\n", done_blocks, sp->send_counter, sp->recv_counter);
+        //printf("i will wait [%d] for block_no=%d\n", ci, sp->block_no);
+      }
+    }
+    if(!sp->done_multiplication){
+      if(wait)
+        sp->recv_wait();
       if(sp->recv_ready()){
-        sp->send();
+        wait = false;
+        if(sp->send_counter < sparse_cycles)
+          sp->send();
         multiply(sp, dense_b, dense_c);
         done_blocks++;
-        debug_d(sp->block_no);
+        //if(mpi_rank==0 || mpi_rank==2){
+          printf("%d | multiply [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
+        //}
+        //debug_d(ci);
+        //debug_d(sp->block_no);
+        sp->done_multiplication = true;
         done_nothing = 0;
       } else done_nothing++;
     } else done_nothing++;
-    if(sp->done_multiplication && sp->send_ready() && sp->recv_counter < num_processes * exponent){
-      sp->recv();
-      done_nothing = 0;
+    if(sp->done_multiplication && sp->send_ready()){
+      if(wait)
+        sp->send_wait();
+      if(sp->send_ready()){
+        wait = false;
+        if(sp->recv_counter < sparse_cycles)
+          sp->recv();
+        done_nothing = 0;
+        sp->done_multiplication = false;
+        //if(mpi_rank==0 || mpi_rank==2){
+          printf("%d | receive [%d] block_no=%d \n", mpi_rank, ci, sp->block_no);
+        //}
+      }
     } else done_nothing++;
     ci = (ci+1) % repl_fact;
   }
+  sparses[ci]->print();
 
-  dense_b->print();
+  //dense_b->print();
   dense_c->print();
 
   for(int ci=0; ci<repl_fact; ++ci){

@@ -44,10 +44,10 @@ Sparse** FullSparse::split(){
   int first_incl = 0; //first col/row in block
 
   for(int block_i=0; block_i<block_count; ++block_i){
-    debug_d(block_count);
-    debug_d(::block_size(block_i));
-    debug_d(split_nnzs[block_i]);
-    debug_d(mpi_meta_init.side);
+    //debug_d(block_count);
+    //debug_d(::block_size(block_i));
+    //debug_d(split_nnzs[block_i]);
+    //debug_d(mpi_meta_init.side);
 
     sp = children[block_i] = Sparse::create(
       ::mpi_meta_init.row_no_max,

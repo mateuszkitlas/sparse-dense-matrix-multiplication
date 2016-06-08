@@ -11,7 +11,7 @@
 class Sparse {
   public:
   void print();
-  void printA();
+  void printA(char*);
   //void printJA();
   //void printIA();
 
@@ -77,20 +77,20 @@ class Sparse {
   //------------------------
   //---  MPI
   //------------------------
-  int rank_from;
   int send_counter;
   int recv_counter;
   bool done_multiplication;
   MPI_Request send_req, recv_req;
-  void send(int rank);
-  void recv(int rank, int block_no);
-  void send(); //knows where to send
-  void recv(); //knows where to send
+  void _send(int rank);
+  void _recv(int rank, int block_no);
+  void send();
+  void recv();
   static bool MPI_Test(MPI_Request* req);
   bool send_ready();
   bool recv_ready();
   void recv_wait();
   void send_wait();
+  void post_async_recv(int rank, int block_no);
   //------------------------
 
   void update_refs();

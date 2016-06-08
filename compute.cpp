@@ -5,6 +5,7 @@ void multiply(Sparse* a, Dense* b, Dense* c){
   SPFOR(a){
     for(int col_i = b->first_col; col_i < last_col_excl; ++col_i){
       *c->val(a->row(), col_i) += a->val() * *b->val(a->col(), col_i);
+      //*c->val(a->row(), col_i) = a->row() + a->val();// * *b->val(a->col(), col_i);
     }
   }
 }

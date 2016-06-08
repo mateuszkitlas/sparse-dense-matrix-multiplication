@@ -88,8 +88,7 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
 
 void Sparse::free_csr(){ free(csr); }
 
-void Sparse::printA(){
-  char x[10000];
+void Sparse::printA(char* x){
   begin();
   for(int r=0; r<row_no; ++r){
     for(int c=0; c<col_no; ++c){
@@ -102,38 +101,39 @@ void Sparse::printA(){
     }
     sprintf(x, "%s\n", x);
   }
-  fprintf(stderr, "%s", x);
   assert(end());
 }
 
 void Sparse::print(){
 #ifdef DEBUG
   /*
-  printf("\
+  char x[10000];
+  sprintf(x, "\
 %d   block_no = %d\n\
     first_row = %d\n\
     first_col = %d\n\
     row_no = %d\n\
     col_no = %d\n\
-    nnz = %d\n\n"
+    nnz = %d\n\n",
 mpi_rank, block_no,
     first_row,
     first_col,
     row_no,
     col_no,
-    nnz,
+    nnz
     );
-  */
-  /*
-  printf("JA: ");
+  
+  
+  sprintf(x, "%sJA: ", x);
   for(int i=0; i<=nnz; ++i)
-    printf("%d ", JA[i]);
-  printf("\n");
-  printf("IA: ");
+    sprintf(x, "%s%d ", x, JA[i]);
+  sprintf(x, "%s\nIA: ", x);
   for(int i=0; i<=row_no; ++i)
-    printf("%d ", IA[i]);
-  printf("\n");*/
-  printA();
+    sprintf(x, "%s%d ", x, IA[i]);
+  sprintf(x, "%s\n", x);
+  printA(x);
+  fprintf(stderr, "%s\n", x);
+  */
 #endif
 }
 
@@ -155,12 +155,11 @@ void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this i
   int last_row = iterIA-1;
   //debug_d(last_row);
   int new_row = g_row - first_row;
-  if(last_row == new_row){
-    ++IA[iterIA];
-  } else {
-    IA[iterIA + 1] = IA[iterIA] + 1;
+  for(int i=last_row; i<new_row; ++i){
+    IA[iterIA + 1] = IA[iterIA];
     iterIA++;
   }
+  ++IA[iterIA];
   iterA++;
 
 

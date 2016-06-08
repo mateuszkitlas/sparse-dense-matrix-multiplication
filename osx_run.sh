@@ -1,6 +1,9 @@
 #!/bin/bash
 
+#make clean && make ARGS="-DDEBUG -DIDENTITY_MATRIX"
 make clean && make ARGS="-DDEBUG"
+if [[ $? == 0 ]] ; then echo ""; else exit ; fi
+
 
 C=2
 let NP="$C*2"
@@ -18,8 +21,8 @@ INFILE=exported_tests/sparse05_000${Y}_$Z
 OUTFILE=exported_tests/result_${X}_000${Y}_$Z
 BFILE=exported_tests/matrix01_000${Y}_$A
 
-cat $INFILE
+#cat $INFILE
 
 mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X
 cat $OUTFILE
-cat $BFILE
+#cat $BFILE
