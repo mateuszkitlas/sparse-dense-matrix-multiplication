@@ -1,3 +1,5 @@
 *.o
 *.swp
 matrixmul
+out.txt
+fails

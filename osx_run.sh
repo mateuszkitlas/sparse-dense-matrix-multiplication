@@ -1,12 +1,10 @@
 #!/bin/bash
 
-#make clean && make ARGS="-DDEBUG -DIDENTITY_MATRIX"
 make clean && make ARGS="-DDEBUG"
-#make clean && make
 if [[ $? == 0 ]] ; then echo ""; else exit ; fi
 
 
-C=2
+C=3
 let NP="$C*2"
 
 
