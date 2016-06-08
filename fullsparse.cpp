@@ -1,7 +1,7 @@
 #include "fullsparse.h"
 #include "common.h"
 #include <stdlib.h>
-
+#include <algorithm>
 
 void FullSparse::init_split(bool by_col_){
   ASSERTS;
@@ -14,7 +14,8 @@ void FullSparse::init_split(bool by_col_){
     int block_i = which_block(by_col ? it_col() : it_row());
     nnzs[block_i]++;
   }
-  nnz_max = *std::max_element(nnzs, nnzs + block_count);
+  for(int i=0; i<block_count; ++i)
+    nnz_max = nnzs[i] > nnz_max ? nnzs[i] : nnz_max;
   debug_d(nnz_max);
 
   this->split_nnzs = nnzs;

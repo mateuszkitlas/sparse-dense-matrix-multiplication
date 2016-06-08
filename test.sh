@@ -5,7 +5,7 @@ FAIL=0;
 ERROR=0;
 
 C=$1
-let NP="$C*2"
+let NP="$C*$2"
 
 #make clean && 
 make

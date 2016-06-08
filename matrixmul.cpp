@@ -101,7 +101,7 @@ int main(int argc, char * argv[])
     full_sparse->init_split(by_col);
 
     debug("coordinator ibcast");
-    MPI_Ibcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
+    MPI_Bcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD);
 
     Sparse** mini_sparses = full_sparse->split();
     full_sparse->print();
@@ -123,7 +123,6 @@ int main(int argc, char * argv[])
 
     debug("coordinator broadcast wait");
 
-    MPI_Wait(&mpi_meta_init_req);
     for(int block_no=1; block_no<block_count; ++block_no){
       Sparse *sp = mini_sparses[block_no];
       sp->send_wait();
@@ -133,8 +132,7 @@ int main(int argc, char * argv[])
     delete mini_sparses;
   } else {
     debug("waiting for broadcast from coordinator");
-    MPI_Ibcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD, &mpi_meta_init_req);
-    MPI_Wait(&mpi_meta_init_req);
+    MPI_Bcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD);
     debug("got broadcast from coordinator");
     my_sparse = Sparse::mpi_create();
     my_sparse->_recv(0, mpi_no(0));
