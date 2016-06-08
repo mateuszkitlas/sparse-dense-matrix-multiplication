@@ -2,6 +2,7 @@
 
 PASS=0;
 FAIL=0;
+ERROR=0;
 
 C=$1
 let NP="$C*2"
@@ -22,23 +23,26 @@ for Y in 10 64 ; do
       #BFILE=exported_tests/matrix01_000${Y}_$A
 
       echo -n "test $INFILE $X... "
-      #mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v
 
       mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v 2>/dev/null > out.txt
-
-      python diff_numbers.py out.txt $OUTFILE
-
       if [[ $? == 0 ]] ; then
-        let PASS="$PASS+1"
-        echo OK
+        python diff_numbers.py out.txt $OUTFILE
+
+        if [[ $? == 0 ]] ; then
+          let PASS="$PASS+1"
+          echo OK
+        else
+          let FAIL="$FAIL+1"
+          echo FAIL
+          diff -w out.txt $OUTFILE >/dev/null >fails/Y${Y}_X${X}_Z${Z}_C${C}.txt
+        fi
       else
-        let FAIL="$FAIL+1"
-        echo FAIL
-        diff -w out.txt $OUTFILE >/dev/null >fails/Y${Y}_X${X}_Z${Z}_C${C}.txt
+        let ERROR="$ERROR+1"
+        echo ERROR
       fi
 
     done
   done
 done
 
-echo "PASS $PASS, FAIL $FAIL"
+echo "PASS $PASS, FAIL $FAIL, ERROR $ERROR"
