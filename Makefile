@@ -15,4 +15,4 @@ $(ALL): %: %.o densematgen.o sparse.o sparse_mpi.o fullsparse.o common.o dense.o
 	$(CXX) $(CXXFLAGS) $@ $<
 
 clean:
-	rm -f *.o *core *~ *.out *.err $(ALL)
+	rm -f *.o *core *~ *.out *.err $(ALL) mk306262.zip

@@ -32,7 +32,7 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
     echo -n "test $INFILE $X... "
 
     if [[ $ONLY_FIRST == 1 ]] ; then
-      $CMD -v $OPTIONS
+      $CMD -v $OPTIONS | tee out.txt
     else
       $CMD -v $OPTIONS 2>/dev/null > out.txt
     fi
@@ -53,6 +53,7 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
       let ERROR="$ERROR+1"
       echo ERROR
     fi
+    rm out.txt
   done
   if [[ $ONLY_FIRST == 1 ]] ; then
     let RESULT="$ERROR + $FAIL"
