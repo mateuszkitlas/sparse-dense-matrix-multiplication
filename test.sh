@@ -6,18 +6,14 @@ ERROR=0;
 
 C=$1
 let NP="$C*$2"
-let USE_IDENTITY_ID="$3+0"
-ARGS=""
-if [[ $USE_IDENTITY == 1 ]] ; then
-  ARGS="-DIDENTITY_MATRIX"
-fi
+ARGS=$3
 let ONLY_FIRST="$4+0"
 
 diff make_args <(echo $ARGS)
 if [[ $? != 0 ]] ; then make clean ; fi
 echo $ARGS > make_args
 
-make ARGS=$ARGS
+make ARGS="$ARGS"
 if [[ $? == 0 ]] ; then echo ""; else exit ; fi
 
 rm -f fails/*.txt
@@ -35,7 +31,7 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
 
     echo -n "test $INFILE $X... "
 
-    if [[ $ONLY_FORST == 1 ]] ; then
+    if [[ $ONLY_FIRST == 1 ]] ; then
       $CMD -v $OPTIONS
     else
       $CMD -v $OPTIONS 2>/dev/null > out.txt
