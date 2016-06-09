@@ -6,40 +6,61 @@ ERROR=0;
 
 C=$1
 let NP="$C*$2"
+let USE_IDENTITY_ID="$3+0"
+ARGS=""
+if [[ $USE_IDENTITY == 1 ]] ; then
+  ARGS="-DIDENTITY_MATRIX"
+fi
+let ONLY_FIRST="$4+0"
 
-#make clean && 
-make
+diff make_args <(echo $ARGS)
+if [[ $? != 0 ]] ; then make clean ; fi
+echo $ARGS > make_args
+
+make ARGS=$ARGS
 if [[ $? == 0 ]] ; then echo ""; else exit ; fi
 
 rm -f fails/*.txt
 
-for OUTFILE in `ls exported_tests/result*` ; do
-  X=$(basename $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\1/g")
-  Y=$(basename $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\2/g")
-  Z=$(basename $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\3/g")
-  A=$(basename $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\4/g")
+for OUTFILE_PATH in `ls exported_tests/result*` ; do
+  for OPTIONS in "" "-i" ; do
+    OUTFILE=$(basename $OUTFILE_PATH)
+    X=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\1/g")
+    Y=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\2/g")
+    Z=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\3/g")
+    A=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\4/g")
 
-  INFILE=exported_tests/sparse05_${Y}_$Z
-  #OUTFILE=exported_tests/result_${X}_${Y}_${Z}_$A
+    INFILE=exported_tests/sparse05_${Y}_$Z
+    CMD="mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X"
 
-  echo -n "test $INFILE $X... "
+    echo -n "test $INFILE $X... "
 
-  mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -ge 1
-  mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X -v 2>/dev/null > out.txt
-  if [[ $? == 0 ]] ; then
-    python diff_numbers.py out.txt $OUTFILE
+    if [[ $ONLY_FORST == 1 ]] ; then
+      $CMD -v $OPTIONS
+    else
+      $CMD -v $OPTIONS 2>/dev/null > out.txt
+    fi
 
     if [[ $? == 0 ]] ; then
-      let PASS="$PASS+1"
-      echo OK
+      python diff_numbers.py out.txt $OUTFILE_PATH
+
+      if [[ $? == 0 ]] ; then
+        let PASS="$PASS+1"
+        echo OK
+        $CMD -ge 1 >/dev/null
+      else
+        let FAIL="$FAIL+1"
+        echo FAIL
+        diff -w out.txt $OUTFILE >/dev/null >fails/$OUTFILE
+      fi
     else
-      let FAIL="$FAIL+1"
-      echo FAIL
-      diff -w out.txt $OUTFILE >/dev/null >fails/Y${Y}_X${X}_Z${Z}_C${C}.txt
+      let ERROR="$ERROR+1"
+      echo ERROR
     fi
-  else
-    let ERROR="$ERROR+1"
-    echo ERROR
+  done
+  if [[ $ONLY_FIRST == 1 ]] ; then
+    let RESULT="$ERROR + $FAIL"
+    exit $RESULT
   fi
 done
 
