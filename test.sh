@@ -61,11 +61,11 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
       echo ERROR
     fi
     rm out.txt
-    if [[ $ONLY_FIRST == 1 ]] ; then
-      let RESULT="$ERROR + $FAIL"
-      exit $RESULT
-    fi
   done
+  if [[ $ONLY_FIRST == 1 ]] ; then
+    let RESULT="$ERROR + $FAIL"
+    exit $RESULT
+  fi
 done
 
 echo "PASS $PASS, FAIL $FAIL, ERROR $ERROR"

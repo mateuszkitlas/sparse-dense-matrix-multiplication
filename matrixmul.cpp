@@ -162,9 +162,8 @@ int main(int argc, char * argv[])
   //---  scatter
   //------------------------
 
-  debug("has my_sparse?");
-  MPI_Barrier(MPI_COMM_WORLD);
-  my_sparse->recv_wait();
+  if((use_inner && my_block_col_no == 0) || (!use_inner))
+    my_sparse->recv_wait();
   debug("has my_sparse");
   if(use_inner){
     inner_replicate_sparse(my_sparse);
@@ -256,7 +255,6 @@ int main(int argc, char * argv[])
         Dense *den = whole_c[block_i];
         //fprintf(stderr, "%lf %lf %d [%d,%d]\n", *den->val(s->row(),s->col()), s->val(), block_i, s->row(), s->col());
         assert(*den->val(s->row(),s->col()) - s->val() < 0.01);
-      debug("ssssss");
       }
       //fprintf(stderr, "cokolwiek\n");
       delete s;

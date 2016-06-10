@@ -14,6 +14,7 @@ int &nnz_max = mpi_meta_init.nnz_max;
 int repl_fact = 1;
 
 
+
 int my_block_col_no = -1;
 //----------------------
 //---- inner
@@ -102,3 +103,21 @@ int which_block(int matrix_i){
     return bigger_blocks_count + i2 / min_block_size;
 }
 
+#ifdef DEBUG
+void debug_print(const char* file, int line, const char* fun, const char* arg_name, const char* s_arg, int d_arg, char type){
+  char printer[1000];
+  if(type == 's')
+    sprintf(printer, "---------  %s  --------", s_arg);
+  else
+    sprintf(printer, "%d", d_arg);
+  fprintf(stderr, "[%d,%d]  %s:%d in %s()  | %s=%s \n",
+      my_block_row_no,
+      my_block_col_no,
+      file,
+      line,
+      fun,
+      arg_name,
+      printer
+      );
+}
+#endif
