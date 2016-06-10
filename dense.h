@@ -19,10 +19,13 @@ class Dense {
     int first_row;
     int first_col;
     Dense(int row_no, int col_no, int first_row, int first_col);
-    Dense(int row_no, int col_no, int first_row, int first_col, int seed);
-    Dense(bool by_col, int block_no);
+    Dense(int block_row_no, int block_col_no);
+    Dense(int block_no);
     ~Dense();
     void print();
+    void generate(int seed);
+    void zero();
+    void alloc();
 
     double* val(int g_row, int g_col);
 

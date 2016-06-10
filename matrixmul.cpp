@@ -11,7 +11,6 @@
 int main(int argc, char * argv[])
 {
   int show_results = 0;
-  int use_inner = 0;
   int gen_seed = -1;
 
   int option = -1;
@@ -49,10 +48,10 @@ int main(int argc, char * argv[])
       if ((mpi_rank) == 0)
       {
         FILE *file_sparse = fopen(optarg, "r");
-        int row_no, col_no, nnz, nnz_max;
-        fscanf(file_sparse, "%d%d%d%d", &row_no, &col_no, &nnz, &nnz_max);
+        int row_no, col_no, nnz;
+        fscanf(file_sparse, "%d%d%d%*d", &row_no, &col_no, &nnz);
         assert(col_no == row_no);
-        mpi_meta_init.side = col_no;
+        side = col_no;
 
         full_sparse = FullSparse::create(row_no, col_no, nnz);
         for(int i=0; i<nnz; ++i)
@@ -86,7 +85,6 @@ int main(int argc, char * argv[])
     MPI_Finalize();
     return 3;
   }
-  init_block_count(by_col);
 
 
   //------------------------
@@ -95,13 +93,13 @@ int main(int argc, char * argv[])
   debug("scatter barrier");
   MPI_Barrier(MPI_COMM_WORLD);
   comm_start = MPI_Wtime();
-  MPI_Request mpi_meta_init_req;
   if(mpi_rank == 0){
+
+    compute_metadata();
 
     full_sparse->init_split(by_col);
 
-    debug("coordinator ibcast");
-    MPI_Bcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD);
+    broadcast_metadata();
 
     Sparse** mini_sparses = full_sparse->split();
     full_sparse->print();
@@ -114,6 +112,10 @@ int main(int argc, char * argv[])
 #endif
     my_sparse = mini_sparses[0];
     my_sparse->post_async_recv(0, 0);
+
+    debug("coordinator ibcast");
+
+
     //sparse->print();
     for(int block_no=1; block_no<block_count; ++block_no){
       Sparse *sp = mini_sparses[block_no];
@@ -132,68 +134,55 @@ int main(int argc, char * argv[])
     delete mini_sparses;
   } else {
     debug("waiting for broadcast from coordinator");
-    MPI_Bcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD);
+    broadcast_metadata();
+    compute_metadata();
     debug("got broadcast from coordinator");
     my_sparse = Sparse::mpi_create();
-    my_sparse->_recv(0, mpi_no(0));
+    my_sparse->_recv(0, my_block_col_no);
   }
 
 
   //------------------------
   //---  dense inits
   //------------------------
-  int my_block_no = mpi_no(0);
 
   if(by_col)
     assert((num_processes % repl_fact) == 0);
   else
     assert((num_processes % (repl_fact*repl_fact)) == 0);
 
-  int
-    dense_row_no = by_col ? mpi_meta_init.side : block_size(my_block_no),
-    dense_col_no = by_col ? block_size(my_block_no) : mpi_meta_init.side,
-    dense_first_row = first_side(false, by_col, my_block_no),
-    dense_first_col = first_side(true, by_col, my_block_no);
-  if(by_col){
-    assert(dense_first_row == 0);
-    assert(dense_row_no == mpi_meta_init.side);
-  }
-  else {
-    assert(dense_first_col == 0);
-    assert(dense_col_no == mpi_meta_init.side);
-  }
-
-  dense_b = new Dense(dense_row_no, dense_col_no, dense_first_row, dense_first_col, gen_seed);
-
-
-
+  dense_b = new Dense(my_block_col_no);
+  dense_b->generate(gen_seed);
 
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
 
 
   //------------------------
-  //---  compute
+  //---  scatter
   //------------------------
 
-
-  sparses = new Sparse*[repl_fact];
+  debug("has my_sparse?");
+  MPI_Barrier(MPI_COMM_WORLD);
   my_sparse->recv_wait();
-  assert(my_sparse->recv_ready());
   debug("has my_sparse");
-  //my_sparse->print();
-  sparses[0] = my_sparse;
-  for(int ci = 1; ci<repl_fact; ci++){
-    sparses[ci] = Sparse::mpi_create();
-    sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
-    my_sparse->_send(mpi_no(-ci));
+  if(use_inner){
+    inner_replicate_sparse(my_sparse);
+  } else {
+    sparses = new Sparse*[repl_fact];
+    sparses[0] = my_sparse;
+    for(int ci = 1; ci<repl_fact; ci++){
+      sparses[ci] = Sparse::mpi_create();
+      sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
+      my_sparse->_send(mpi_no(-ci));
+    }
+    debug("cokolwiek");
+    for(int ci = 0; ci<repl_fact; ci++){
+      sparses[ci]->recv_wait();
+      sparses[ci]->send_wait();
+    }
   }
 
-
-  for(int ci = 0; ci<repl_fact; ci++){
-    sparses[ci]->recv_wait();
-    sparses[ci]->send_wait();
-  }
   debug("done scatter");
 
   comp_start = MPI_Wtime();
@@ -205,10 +194,10 @@ int main(int argc, char * argv[])
 
 
   for(int e=0; e<exponent; ++e){
-    dense_c = new Dense(by_col, my_block_no);
+    dense_c = new Dense(my_block_col_no);
+    dense_c->zero();
     int ci=0;
     int done_blocks=0;
-    int done_nothing=0;
     int sparse_cycles = block_count / repl_fact;
 
     int *cycles_done = new int[repl_fact]();
@@ -242,13 +231,13 @@ int main(int argc, char * argv[])
       whole_c[0] = dense_c;
       MPI_Request *reqs = new MPI_Request[block_count-1];
       for(int block_i=1; block_i < block_count; ++block_i){
-        Dense *den = new Dense(by_col, block_i);
+        Dense *den = new Dense(block_i);
+        den->alloc();
         whole_c[block_i] = den;
         den->recv(block_i, &reqs[block_i-1]);
       }
       MPI_Waitall(block_count-1, reqs, MPI_STATUSES_IGNORE);
       delete reqs;
-      int &side = mpi_meta_init.side;
 
 #ifndef IDENTITY_MATRIX
       printf("%d %d\n", side, side);
@@ -256,17 +245,18 @@ int main(int argc, char * argv[])
         for(int c=0; c<side; ++c){
           int block_i = which_block(by_col ? c : r);
           Dense *den = whole_c[block_i];
-          printf("%*.5lf ", *den->val(r,c), 10);
+          printf("%*.5lf ", 10, *den->val(r,c));
         }
         printf("\n");
       }
 #else
       Sparse *s = full_sparse;
       SPFOR(s){
-        int block_i = which_block(by_col ? s->col() : s->row());
+        int block_i = which_block(s->col());
         Dense *den = whole_c[block_i];
         //fprintf(stderr, "%lf %lf %d [%d,%d]\n", *den->val(s->row(),s->col()), s->val(), block_i, s->row(), s->col());
         assert(*den->val(s->row(),s->col()) - s->val() < 0.01);
+      debug("ssssss");
       }
       //fprintf(stderr, "cokolwiek\n");
       delete s;

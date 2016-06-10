@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <cstdio>
 #include <mpi.h>
-#include "common.h"
 
 #define SPFOR(sp) for(sp->begin(); !sp->end(); sp->next())
 
@@ -20,12 +19,9 @@ class Sparse {
   int *IA, *JA;
   double *A;
 
-  static size_t csr_alloc_size(
-      int row_no_max,
-      int nnz_max);
-  static void* csr_alloc(
-      int row_no_max,
-      int nnz_max);
+  static size_t csr_alloc_size(int row_no, int nnz);
+  static void* csr_alloc();
+  static void* csr_alloc(int row_no_max, int nnz_max);
 
   int in_row;
   void begin();
@@ -36,15 +32,7 @@ class Sparse {
   int row(){
     return it_row() + first_row;
   }
-  int col(){
-    int result = it_col() + first_col;
-    if(result < 0){
-      debug_d(0+result);
-      debug_d(0+first_col);
-      debug_d(0+it_col());
-    }
-    return it_col() + first_col;
-  }
+  int col();
   void next(){ ++iterA; }
   bool end(){ return iterA == nnz; }
 
@@ -53,27 +41,15 @@ class Sparse {
   void done_insert();
 
   size_t csr_size();
-  static Sparse* mpi_create(){
-    return create(
-        ::mpi_meta_init.row_no_max,
-        ::mpi_meta_init.nnz_max,
-        -1,
-        -1,
-        ::mpi_meta_init.row_no_max,
-        -1,
-        ::mpi_meta_init.nnz_max);
-  }
+  static Sparse* mpi_create();
   static Sparse* create(
-      int row_no_max,
-      int nnz_max,
       int first_row,
       int first_col,
       int row_no,
       int col_no,
       int nnz);
-  Sparse(void* csr, int row_no_max, int nnz_max);
+  Sparse(void* csr);
   void free_csr();
-  int side(); //row_no; asserts row_no == col_no
   void test();
 
   //------------------------
@@ -100,9 +76,6 @@ class Sparse {
   int block_no;
 
   int iterA, iterIA;
-  protected:
-  int nnz_max, row_no_max;
-
 };
 
 #endif

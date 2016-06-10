@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <mpi.h>
 #include <assert.h>
+#include "sparse.h"
 
 #ifdef DEBUG
 
@@ -37,21 +38,44 @@ struct Mpi_meta_init{
   int nnz_max;
   int side;
 };
-extern Mpi_meta_init mpi_meta_init;
+extern void broadcast_metadata();
+extern void compute_metadata();
+
+extern int use_inner;
 
 int MPI_Wait(MPI_Request* request);
 
 extern int mpi_rank;
 extern int num_processes;
-extern void init_block_count(bool by_col);
 extern int block_count;
+extern int bigger_blocks_count;
+extern int& row_no_max;
+extern int& nnz_max;
+extern int& side;
 extern int block_size(int block_no);
-extern int first_side(bool get_col, bool by_col, int block_no);
+extern int first_side(int block_no);
 extern int repl_fact;
 extern int which_block(int matrix_i);
-extern int max_block_size();
-extern int min_block_size();
+extern int max_block_size;
+extern int min_block_size;
 
 int mpi_no(int);
+
+
+extern int my_block_col_no;
+//----------------------
+//---- inner
+//----------------------
+
+extern MPI_Comm mpi_inner_group_comm;
+extern int my_block_row_no;
+extern void inner_replicate_sparse(Sparse* my_sparse);
+
+//----------------------
+//---- column
+//----------------------
+
+
+//----------------------
 
 #endif

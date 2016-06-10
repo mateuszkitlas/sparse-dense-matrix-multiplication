@@ -1,14 +1,63 @@
 #include "common.h"
 
 Mpi_meta_init mpi_meta_init = {-1, -1, -1};
-
-int mpi_rank =  -1;
+int bigger_blocks_count = -1;
+int use_inner = 0;
+int mpi_rank = -1;
 int num_processes = -1;
-void init_block_count(bool by_col){
-  block_count = by_col ? num_processes : num_processes / repl_fact;
-};
 int block_count = -1;
+int min_block_size = -1;
+int max_block_size = -1;
+int &side = mpi_meta_init.side;
+int &row_no_max = mpi_meta_init.row_no_max;
+int &nnz_max = mpi_meta_init.nnz_max;
 int repl_fact = 1;
+
+
+int my_block_col_no = -1;
+//----------------------
+//---- inner
+//----------------------
+
+MPI_Comm mpi_inner_group_comm;
+int my_block_row_no = -1;
+
+//----------------------
+//---- column
+//----------------------
+
+
+//----------------------
+
+
+
+void compute_metadata(){
+  block_count = use_inner
+    ? num_processes / repl_fact
+    : num_processes;
+  bigger_blocks_count = side % block_count;
+  min_block_size = side / block_count;
+  max_block_size = (bigger_blocks_count > 0) + min_block_size;
+  if(use_inner){
+    my_block_col_no = mpi_rank / block_count;
+    my_block_row_no = mpi_rank % block_count;
+  } else {
+    my_block_col_no = mpi_rank;
+  }
+}
+
+void broadcast_metadata(){
+  MPI_Bcast(&mpi_meta_init, sizeof(mpi_meta_init), MPI_BYTE, 0, MPI_COMM_WORLD);
+}
+
+void inner_replicate_sparse(Sparse* my_sparse){
+  MPI_Comm_split(MPI_COMM_WORLD, my_block_col_no, my_block_row_no, &mpi_inner_group_comm);
+  int csr_size = (my_block_row_no == 0)
+    ? my_sparse->csr_size()
+    : Sparse::csr_alloc_size(row_no_max, nnz_max);
+  MPI_Bcast(my_sparse->csr, csr_size, MPI_BYTE, 0, mpi_inner_group_comm);
+}
+
 
 int mpi_no(int x){
   return (num_processes + mpi_rank + x) % num_processes;
@@ -21,58 +70,35 @@ int MPI_Wait(MPI_Request* request){
 //divides the most equally
 int block_size(int block_no){
   ASSERTS;
-  int side = mpi_meta_init.side;
   return side / block_count + ((side % block_count) >= (block_no + 1) );
 }
 
 //TODO remove first_row and first_col from Sparse
-int first_side(bool get_col, bool by_col, int block_no){
+int first_side(int block_no){
   ASSERTS;
-  int &side = mpi_meta_init.side;
-
-  if(by_col) //column A
-    if(!get_col) //first_row
-      return 0;
-
-  if(!by_col) //inner ABC
-    if(get_col) //first_col
-      return 0;
-
-  int bigger_block_size = max_block_size();
-  int smaller_block_size = min_block_size();
   int smaller_blocks_count = block_no - side % block_count;
   if(smaller_blocks_count > 0)
-    return smaller_blocks_count * smaller_block_size + bigger_block_size * (side % block_count);
+    return smaller_blocks_count * min_block_size + max_block_size * (side % block_count);
   else
-    return block_no * bigger_block_size;
+    return block_no * max_block_size;
 }
 
-int max_block_size(){
-  int &side = mpi_meta_init.side;
-  return (side % block_count > 0) + side / block_count;
-}
-
-int min_block_size(){
-  int &side = mpi_meta_init.side;
-  return side / block_count;
-}
 
 int which_block(int matrix_i){
-  int &side = mpi_meta_init.side;
-  int bigger_blocks_count = side % block_count;
-  int i2 = matrix_i - max_block_size() * bigger_blocks_count;
+  int i2 = matrix_i - max_block_size * bigger_blocks_count;
 #ifdef DEBUG
   int x;
   if(i2 < 0)
-     x = matrix_i / max_block_size();
+     x = matrix_i / max_block_size;
   else
-     x = bigger_blocks_count + i2 / min_block_size();
+     x = bigger_blocks_count + i2 / min_block_size;
   //fprintf(stderr, 
   //    "side %d, bigger blocks count%d, block_count %d, max_block_size() %d, min_block_size() %d, matrix_i %d, i2=%d, result=%d\n",
   //    side, bigger_blocks_count, block_count, max_block_size(), min_block_size(), matrix_i, i2, x);
 #endif
   if(i2 < 0)
-    return matrix_i / max_block_size();
+    return matrix_i / max_block_size;
   else
-    return bigger_blocks_count + i2 / min_block_size();
+    return bigger_blocks_count + i2 / min_block_size;
 }
+

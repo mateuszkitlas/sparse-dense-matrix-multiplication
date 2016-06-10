@@ -20,6 +20,13 @@ rm -f fails/*.txt
 
 for OUTFILE_PATH in `ls exported_tests/result*` ; do
   for OPTIONS in "" "-i" ; do
+    if [[ $ONLY_FIRST == 1 ]] ; then
+      echo "==================================================================================="
+      echo "==================================================================================="
+      echo "==================================================================================="
+      echo "==================================================================================="
+    fi
+
     OUTFILE=$(basename $OUTFILE_PATH)
     X=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\1/g")
     Y=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\2/g")
@@ -29,7 +36,7 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
     INFILE=exported_tests/sparse05_${Y}_$Z
     CMD="mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X"
 
-    echo -n "test $INFILE $X... "
+    echo -n "test $OPTIONS $INFILE $X... "
 
     if [[ $ONLY_FIRST == 1 ]] ; then
       $CMD -v $OPTIONS | tee out.txt
@@ -54,11 +61,11 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
       echo ERROR
     fi
     rm out.txt
+    if [[ $ONLY_FIRST == 1 ]] ; then
+      let RESULT="$ERROR + $FAIL"
+      exit $RESULT
+    fi
   done
-  if [[ $ONLY_FIRST == 1 ]] ; then
-    let RESULT="$ERROR + $FAIL"
-    exit $RESULT
-  fi
 done
 
 echo "PASS $PASS, FAIL $FAIL, ERROR $ERROR"

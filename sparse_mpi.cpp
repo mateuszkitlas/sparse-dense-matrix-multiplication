@@ -1,4 +1,5 @@
 #include "sparse.h"
+#include "common.h"
 #include <stdlib.h>
 
 
@@ -22,9 +23,10 @@ void Sparse::_send(int rank){
 
 void Sparse::_recv(int rank, int block_no){
   assert(block_no >= 0);
+  assert(Sparse::csr_alloc_size(row_no_max, nnz_max) > 0);
   MPI_Irecv(
       csr,
-      csr_alloc_size(row_no_max, nnz_max),
+      Sparse::csr_alloc_size(row_no_max, nnz_max),
       MPI_BYTE,
       rank, 1000+block_no, MPI_COMM_WORLD, &recv_req);
   //assert(recv_req != MPI_REQUEST_NULL);

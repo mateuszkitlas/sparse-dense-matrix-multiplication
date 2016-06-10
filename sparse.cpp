@@ -8,45 +8,40 @@ void Sparse::update_refs(){
   A = (double*)(JA + nnz + 1);
 }
 size_t Sparse::csr_size(){
-  return sizeof(int)*(5 + (row_no + 1) + (nnz + 1)) + sizeof(double)*(nnz);
-}
-size_t Sparse::csr_alloc_size(
-      int row_no_max,
-      int nnz_max){//per row
   //meta - first_row, first_col, row_no, col_no, nnz - int[5]
   //IA - int[row_no_max + 1]
   //JA - int[matrix_size + 1]
   //A - double[matrix_size]
-  return
-      sizeof(int)*( 5 + (row_no_max + 1) + (nnz_max + 1) )+
-      sizeof(double)*( nnz_max );
+  return sizeof(int)*(5 + (row_no + 1) + (nnz + 1)) + sizeof(double)*(nnz);
 }
-void* Sparse::csr_alloc(
-      int row_no_max,
-      int nnz_max){//per row
+size_t Sparse::csr_alloc_size(int row_no, int nnz){
+  return
+      sizeof(int)*( 5 + (row_no + 1) + (nnz + 1) )+
+      sizeof(double)*( nnz );
+}
+void* Sparse::csr_alloc(){
   return malloc(Sparse::csr_alloc_size(row_no_max, nnz_max));
+}
+void* Sparse::csr_alloc(int row_no, int nnz){
+  return malloc(Sparse::csr_alloc_size(row_no, nnz));
 }
 
 Sparse* Sparse::create(
-    int row_no_max,
-    int nnz_max,
     int first_row,
     int first_col,
     int row_no,
     int col_no,
     int nnz){
-  void* csr = Sparse::csr_alloc(row_no_max, nnz_max);
+  void* csr = Sparse::csr_alloc();
 
   *( ((int*)csr) + 2 ) = row_no;
   *( ((int*)csr) + 4 ) = nnz;
 
-  Sparse* sp = new Sparse(csr, row_no_max, nnz_max);
+  Sparse* sp = new Sparse(csr);
   sp->first_row = first_row;
   sp->first_col = first_col;
   sp->col_no = col_no;
 
-  sp->row_no_max = row_no_max;
-  sp->nnz_max = nnz_max;
   sp->IA[0]=0;
   sp->IA[1]=0;
   sp->JA[0]=0;
@@ -65,7 +60,7 @@ Sparse* Sparse::create(
   return sp;
 }
 
-Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
+Sparse::Sparse(void* csr)
     : csr( csr )
     , first_row( *( ((int*)csr) + 0 ) )
     , first_col( *( ((int*)csr) + 1 ) )
@@ -78,8 +73,6 @@ Sparse::Sparse(void* csr, int row_no_max, int nnz_max)
   send_counter = 0;
   recv_counter = 0;
   assert(csr == this->csr);
-  this->row_no_max = row_no_max;
-  this->nnz_max = nnz_max;
   update_refs();
   begin();
   block_no = -1;
@@ -188,4 +181,23 @@ void Sparse::insert(double v, int g_col, int g_row){ //global row / col - this i
 
 
   //debug_s("inserted");
+}
+
+int Sparse::col(){
+  int result = it_col() + first_col;
+  if(result < 0){
+    debug_d(0+result);
+    debug_d(0+first_col);
+    debug_d(0+it_col());
+  }
+  return it_col() + first_col;
+}
+
+Sparse* Sparse::mpi_create(){
+  return create(
+      -1,
+      -1,
+      row_no_max,
+      -1,
+      nnz_max);
 }

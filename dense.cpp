@@ -3,8 +3,15 @@
 #include "dense.h"
 #include "densematgen.h"
 
-Dense::Dense(int row_no, int col_no, int first_row, int first_col){
+void Dense::alloc(){
+  data = new double[row_no*col_no];
+}
+
+void Dense::zero(){
   data = new double[row_no*col_no]();
+}
+
+Dense::Dense(int row_no, int col_no, int first_row, int first_col){
   this->row_no = row_no;
   this->col_no = col_no;
   this->first_row = first_row;
@@ -22,12 +29,8 @@ int Dense::ge_elements(double ge){
   return n;
 }
 
-Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
-  data = new double[row_no*col_no];
-  this->row_no = row_no;
-  this->col_no = col_no;
-  this->first_row = first_row;
-  this->first_col = first_col;
+void Dense::generate(int seed){
+  alloc();
   for(int r=0; r<row_no; ++r)
     for(int c=0; c<col_no; ++c){
 #ifdef IDENTITY_MATRIX
@@ -42,21 +45,23 @@ Dense::Dense(int row_no, int col_no, int first_row, int first_col, int seed){
   //print();
 }
 
-
-Dense::Dense(bool by_col, int block_no) : Dense(
-    by_col ? mpi_meta_init.side : block_size(block_no),
-    by_col ? block_size(block_no) : mpi_meta_init.side,
-    first_side(false, by_col, block_no),
-    first_side(true, by_col, block_no)
+Dense::Dense(int block_row_no, int block_col_no) : Dense(
+    block_size(block_row_no),
+    block_size(block_col_no),
+    first_side(block_row_no),
+    first_side(block_col_no)
   ){
-  if(by_col){
-    assert(first_row == 0);
-    assert(row_no == mpi_meta_init.side);
-  }
-  else {
-    assert(first_col == 0);
-    assert(col_no == mpi_meta_init.side);
-  }
+}
+
+
+Dense::Dense(int block_no) : Dense(
+    side,
+    block_size(block_no),
+    0,
+    first_side(block_no)
+  ){
+  assert(first_row == 0);
+  assert(row_no == side);
 }
 
 
