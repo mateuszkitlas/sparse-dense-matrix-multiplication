@@ -19,7 +19,7 @@ if [[ $? == 0 ]] ; then echo ""; else exit ; fi
 rm -f fails/*.txt
 
 for OUTFILE_PATH in `ls exported_tests/result*` ; do
-  for OPTIONS in "" "-i" ; do
+  for OPTIONS in "" "-i"; do
     if [[ $ONLY_FIRST == 1 ]] ; then
       echo "==================================================================================="
       echo "==================================================================================="

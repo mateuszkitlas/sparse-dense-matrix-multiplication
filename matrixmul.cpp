@@ -120,7 +120,7 @@ int main(int argc, char * argv[])
     for(int block_no=1; block_no<block_count; ++block_no){
       Sparse *sp = mini_sparses[block_no];
       //sp->print();
-      sp->_send(block_no);
+      sp->_send(mpi_no(use_inner ? block_no * block_count : block_no));
     }
 
     debug("coordinator broadcast wait");
@@ -138,7 +138,15 @@ int main(int argc, char * argv[])
     compute_metadata();
     debug("got broadcast from coordinator");
     my_sparse = Sparse::mpi_create();
-    my_sparse->_recv(0, my_block_col_no);
+    if(use_inner) {
+      if(my_block_col_no == 0){
+        debug("inner recv");
+        my_sparse->_recv(0, my_block_row_no);
+      }
+    } else {
+      debug("column recv");
+      my_sparse->_recv(0, my_block_col_no);
+    }
   }
 
 
@@ -162,9 +170,12 @@ int main(int argc, char * argv[])
   //---  scatter
   //------------------------
 
-  if((use_inner && my_block_col_no == 0) || (!use_inner))
+  if((use_inner && my_block_col_no == 0) || (!use_inner)){
     my_sparse->recv_wait();
-  debug("has my_sparse");
+    debug("has my_sparse");
+  } else {
+    debug("not coordinator");
+  }
   if(use_inner){
     inner_replicate_sparse(my_sparse);
   } else {
@@ -175,7 +186,6 @@ int main(int argc, char * argv[])
       sparses[ci]->_recv( mpi_no(ci), mpi_no(ci) );
       my_sparse->_send(mpi_no(-ci));
     }
-    debug("cokolwiek");
     for(int ci = 0; ci<repl_fact; ci++){
       sparses[ci]->recv_wait();
       sparses[ci]->send_wait();
@@ -186,6 +196,7 @@ int main(int argc, char * argv[])
 
   comp_start = MPI_Wtime();
   MPI_Barrier(MPI_COMM_WORLD);
+  debug("compute");
 
   //------------------------
   //---  compute
@@ -193,31 +204,34 @@ int main(int argc, char * argv[])
 
 
   for(int e=0; e<exponent; ++e){
-    dense_c = new Dense(my_block_col_no);
-    dense_c->zero();
-    int ci=0;
-    int done_blocks=0;
-    int sparse_cycles = block_count / repl_fact;
+    if(use_inner){
+    } else {
+      dense_c = new Dense(my_block_col_no);
+      dense_c->zero();
+      int ci=0;
+      int done_blocks=0;
+      int sparse_cycles = block_count / repl_fact;
 
-    int *cycles_done = new int[repl_fact]();
+      int *cycles_done = new int[repl_fact]();
 
-    while(done_blocks < block_count){
-      Sparse *sp = sparses[ci];
-      sp->recv_wait();
-      sp->send();
-      multiply(sp, dense_b, dense_c);
-      if(++cycles_done[ci] < sparse_cycles){
-        sp->send_wait();
-        sp->recv();
-      } else {
-        assert(sp->recv_ready());
+      while(done_blocks < block_count){
+        Sparse *sp = sparses[ci];
+        sp->recv_wait();
+        sp->send();
+        multiply(sp, dense_b, dense_c);
+        if(++cycles_done[ci] < sparse_cycles){
+          sp->send_wait();
+          sp->recv();
+        } else {
+          assert(sp->recv_ready());
+        }
+        ci = (ci+1) % repl_fact;
+        done_blocks++;
       }
-      ci = (ci+1) % repl_fact;
-      done_blocks++;
+      delete cycles_done;
+      delete dense_b;
+      dense_b = dense_c;
     }
-    delete cycles_done;
-    delete dense_b;
-    dense_b = dense_c;
   }
 
   comp_end = MPI_Wtime();

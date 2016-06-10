@@ -4,16 +4,29 @@
 
 
 void Sparse::send(){
-  _send( mpi_no(-repl_fact) );
+  _send(
+    use_inner
+      ? mpi_inner_no(1)
+      : mpi_no(-repl_fact)
+  );
 }
 
 void Sparse::recv(){
-  _recv( mpi_no(repl_fact), (block_no + repl_fact) % block_count );
+  if(use_inner)
+    _recv(
+      mpi_inner_no(-1),
+      (block_no + 1) % block_count
+    );
+  else
+    _recv(
+      mpi_no(repl_fact),
+      (block_no + repl_fact) % block_count
+    );
 }
 
 void Sparse::_send(int rank){
 #ifdef DEBUG
-  //printf("send %d -> %d, block_no=%d\n", mpi_rank, rank, block_no);
+  printf("send %d -> %d, block_no=%d\n", mpi_rank, rank, block_no);
 #endif
   assert(block_no >= 0);
   MPI_Isend(csr, csr_size(), MPI_BYTE, rank, 1000+block_no, MPI_COMM_WORLD, &send_req);
@@ -24,6 +37,9 @@ void Sparse::_send(int rank){
 void Sparse::_recv(int rank, int block_no){
   assert(block_no >= 0);
   assert(Sparse::csr_alloc_size(row_no_max, nnz_max) > 0);
+#ifdef DEBUG
+  printf("recv %d -> %d, block_no=%d\n", rank, mpi_rank, block_no);
+#endif
   MPI_Irecv(
       csr,
       Sparse::csr_alloc_size(row_no_max, nnz_max),

@@ -69,6 +69,7 @@ extern int my_block_col_no;
 extern MPI_Comm mpi_inner_group_comm;
 extern int my_block_row_no;
 extern void inner_replicate_sparse(Sparse* my_sparse);
+extern int mpi_inner_no(int);
 
 //----------------------
 //---- column
