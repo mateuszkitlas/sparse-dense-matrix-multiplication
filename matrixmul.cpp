@@ -23,7 +23,9 @@ int main(int argc, char * argv[])
   Sparse** sparses = NULL;
   Sparse* my_sparse = NULL;
   Dense* dense_b = NULL;
+  Dense** inner_dense_bs = NULL;
   Dense* dense_c = NULL;
+  Dense** inner_dense_cs = NULL;
   FullSparse* full_sparse = NULL; //only for coordinator
   bool by_col = true; //by_col == true -> split column as in "colmn A alg"
 
@@ -88,7 +90,7 @@ int main(int argc, char * argv[])
 
 
   //------------------------
-  //---  scatter
+  //---  proces 0 create sparses A
   //------------------------
   debug("scatter barrier");
   MPI_Barrier(MPI_COMM_WORLD);
@@ -150,17 +152,51 @@ int main(int argc, char * argv[])
   }
 
 
+  char x[10000];
+  sprintf(x, "----------888|  %d  |--------\n", mpi_no(0));
+  for(int r=0; r<block_count; ++r){
+    for(int c=0; c<block_count; ++c){
+      sprintf(x, "%s %d ", x, my_inner_row(r) && c == my_block_col_no);
+    }
+    sprintf(x, "%s\n", x);
+  }
+  sprintf(x, "%s-----------\n", x);
+  fprintf(stderr, "%s", x);
+
+
   //------------------------
   //---  dense inits
   //------------------------
 
-  if(by_col)
+  if(use_inner){
     assert((num_processes % repl_fact) == 0);
-  else
-    assert((num_processes % (repl_fact*repl_fact)) == 0);
 
-  dense_b = new Dense(my_block_col_no);
-  dense_b->generate(gen_seed);
+    inner_dense_bs = new Dense*[block_count];
+    inner_dense_cs = new Dense*[pc2];
+
+    for(int i=0; i<pc2; ++i){
+      inner_dense_cs[i] = new Dense(inner_row_no(i), my_block_col_no);
+      dd(inner_row_no(i));
+      dd(my_block_col_no);
+      inner_dense_cs[i]->zero();
+    }
+
+    for(int block_row_i=0; block_row_i<block_count; ++block_row_i){
+      Dense *db = new Dense(block_row_i, my_block_col_no);
+      if(my_inner_row(block_row_i)){
+        db->generate(gen_seed);
+      } else {
+        db->alloc();
+      }
+      inner_dense_bs[block_row_i] = db;
+    }
+
+  } else {
+    assert((num_processes % (repl_fact*repl_fact)) == 0);
+    dense_b = new Dense(my_block_col_no);
+    dense_b->generate(gen_seed);
+  }
+
 
   MPI_Barrier(MPI_COMM_WORLD);
   comm_end = MPI_Wtime();
@@ -176,8 +212,43 @@ int main(int argc, char * argv[])
   } else {
     debug("not coordinator");
   }
+
+
   if(use_inner){
+
+    debug("attempting to send B");
+
+    //rozsyłanie macierzy B
+    for(int block_row_i=0; block_row_i<block_count; ++block_row_i){
+      Dense *db = inner_dense_bs[block_row_i];
+      if(my_inner_row(block_row_i)){
+        for(int i=0; i<pc2; ++i){
+          if(i == my_big_block_row_no)
+            continue;
+          db->_send(i);
+        }
+      } else {
+        db->_recv(block_row_i);
+      }
+    }
+
+    debug("attempting to replicate A");
+
+    //replikacja macierzy A
     inner_replicate_sparse(my_sparse);
+    
+    debug("attempting to get B");
+
+    //odbieranie macierzy B
+    for(int block_row_i=0; block_row_i<block_count; ++block_row_i){
+      if(my_inner_row(block_row_i)){
+        Dense *db = inner_dense_bs[block_row_i];
+        debug_d(block_row_i);
+        db->wait();
+      }
+    }
+
+
   } else {
     sparses = new Sparse*[repl_fact];
     sparses[0] = my_sparse;
@@ -205,6 +276,23 @@ int main(int argc, char * argv[])
 
   for(int e=0; e<exponent; ++e){
     if(use_inner){
+
+      int ci=0;
+      Sparse *sp = my_sparse;
+
+      for(int ci=0;  ci<pc2-1; ++ci){
+        sp->recv_wait();
+        sp->send();
+        for(int bi=0; bi<block_count; ++bi)
+          multiply(sp, inner_dense_bs[bi], inner_dense_cs[ci]);
+        sp->send_wait();
+        sp->recv();
+      }
+      for(int bi=0; bi<block_count; ++bi)
+        multiply(sp, inner_dense_bs[bi], inner_dense_cs[ci]);
+      sp->recv_wait();
+
+
     } else {
       dense_c = new Dense(my_block_col_no);
       dense_c->zero();
@@ -240,14 +328,38 @@ int main(int argc, char * argv[])
   {
     debug("show results");
     if(mpi_rank == 0){
-      Dense **whole_c = new Dense*[block_count];
-      whole_c[0] = dense_c;
-      MPI_Request *reqs = new MPI_Request[block_count-1];
-      for(int block_i=1; block_i < block_count; ++block_i){
-        Dense *den = new Dense(block_i);
-        den->alloc();
-        whole_c[block_i] = den;
-        den->recv(block_i, &reqs[block_i-1]);
+      Dense **whole_c;
+      MPI_Request *reqs;
+      if(use_inner){
+        int bc2 = block_count*block_count;
+        reqs = new MPI_Request[bc2];
+        whole_c = new Dense*[bc2];
+
+        for(int block_ri=0; block_ri < pc2; ++block_ri){
+         for(int block_ci=0; block_ci < block_count; ++block_ci){
+            int rank = to_rank(block_ri, block_ci);
+            if(my_inner_row(block_ri) && block_ci == my_block_col_no){
+              assert(block_ri < pc2);
+              whole_c[rank] = inner_dense_cs[block_ri];
+              reqs[rank] = MPI_REQUEST_NULL;
+            } else {
+              Dense *den = new Dense(block_ri, block_ci);
+              den->alloc();
+              whole_c[rank] = den;
+              den->recv(rank, &reqs[rank]);
+            }
+          }
+        }
+      } else {
+        reqs = new MPI_Request[block_count-1];
+        whole_c = new Dense*[block_count];
+        whole_c[0] = dense_c;
+        for(int block_i=1; block_i < block_count; ++block_i){
+          Dense *den = new Dense(block_i);
+          den->alloc();
+          whole_c[block_i] = den;
+          den->recv(block_i, &reqs[block_i-1]);
+        }
       }
       MPI_Waitall(block_count-1, reqs, MPI_STATUSES_IGNORE);
       delete reqs;
@@ -275,8 +387,16 @@ int main(int argc, char * argv[])
 #endif
       delete whole_c;
     } else {
-      dense_c->send();
-      delete dense_c;
+      if(use_inner){
+        MPI_Request *final_send_req = new MPI_Request[pc2];
+        for(int i=0; i<pc2; ++i)
+          inner_dense_cs[i]->final_send(i, final_send_req + i);
+        MPI_Waitall(pc2, final_send_req, MPI_STATUSES_IGNORE);
+        delete final_send_req;
+      } else {
+        dense_c->final_send();
+        delete dense_c;
+      }
     }
   }
   if (count_ge)

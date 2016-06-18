@@ -12,6 +12,8 @@ void Dense::zero(){
 }
 
 Dense::Dense(int row_no, int col_no, int first_row, int first_col){
+  send_req = MPI_REQUEST_NULL;
+  recv_req = MPI_REQUEST_NULL;
   this->row_no = row_no;
   this->col_no = col_no;
   this->first_row = first_row;
@@ -51,8 +53,8 @@ Dense::Dense(int block_row_no, int block_col_no) : Dense(
     first_side(block_row_no),
     first_side(block_col_no)
   ){
+  //father = block_row_no * block_count + block_col_no;
 }
-
 
 Dense::Dense(int block_no) : Dense(
     side,
@@ -82,6 +84,7 @@ int Dense::my_row(int g_row){
   int result = g_row - first_row;
 #ifdef DEBUG
   if(result >= row_no || first_row > g_row){
+    print();
     debug_s(&name);
     debug_d(first_row);
     debug_d(g_row);
@@ -118,11 +121,31 @@ void Dense::print(){
 #endif
 }
 
-void Dense::send(){
+void Dense::final_send(){ //column
   MPI_Request r;
   MPI_Isend(data, row_no*col_no, MPI_DOUBLE, 0, 2000, MPI_COMM_WORLD, &r);
   MPI_Wait(&r);
   debug("done");
+}
+
+void Dense::final_send(int x, MPI_Request *r){ //inner
+  MPI_Isend(data, row_no*col_no, MPI_DOUBLE, 0, 4000 + x , MPI_COMM_WORLD, r);
+}
+
+void Dense::final_recv(int x, MPI_Request *r){ //inner
+  MPI_Isend(data, row_no*col_no, MPI_DOUBLE, 0, 4000 + x , MPI_COMM_WORLD, r);
+}
+
+void Dense::wait(){
+  MPI_Wait(&recv_req);
+  MPI_Wait(&send_req);
+}
+
+void Dense::_send(int rank){
+  MPI_Isend(data, row_no*col_no, MPI_DOUBLE, rank * block_count + my_block_col_no, 3000, MPI_COMM_WORLD, &send_req);
+}
+void Dense::_recv(int rank){
+  MPI_Irecv(data, row_no*col_no, MPI_DOUBLE, rank * block_count + my_block_col_no, 3000, MPI_COMM_WORLD, &recv_req);
 }
 
 void Dense::recv(int rank, MPI_Request* mpi_recv){

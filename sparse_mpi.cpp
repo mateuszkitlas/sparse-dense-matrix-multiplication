@@ -6,7 +6,7 @@
 void Sparse::send(){
   _send(
     use_inner
-      ? mpi_inner_no(1)
+      ? ((my_block_row_no + 1) % block_count)
       : mpi_no(-repl_fact)
   );
 }
@@ -14,7 +14,7 @@ void Sparse::send(){
 void Sparse::recv(){
   if(use_inner)
     _recv(
-      mpi_inner_no(-1),
+      ((my_block_row_no - 1) % block_count),
       (block_no + 1) % block_count
     );
   else

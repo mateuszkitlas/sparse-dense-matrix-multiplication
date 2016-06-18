@@ -32,6 +32,7 @@ for OUTFILE_PATH in `ls exported_tests/result*` ; do
     Y=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\2/g")
     Z=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\3/g")
     A=$(echo $OUTFILE | sed -E "s/result_(.*)_(.*)_(.*)_(.*)/\4/g")
+    Y=64
 
     INFILE=exported_tests/sparse05_${Y}_$Z
     CMD="mpirun -np $NP ./matrixmul -f $INFILE -s $A -c $C -e $X"

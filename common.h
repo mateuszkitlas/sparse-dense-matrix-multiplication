@@ -11,6 +11,7 @@
 void debug_print(const char* file, int line, const char* fun, const char* arg_name, const char* s_arg, int d_arg, char type);
 
 #define debug_d(arg) { debug_print(__FILE__, __LINE__, __FUNCTION__, #arg, "", arg, 'd'); }
+#define dd(arg) { debug_print(__FILE__, __LINE__, __FUNCTION__, #arg, "", arg, 'd'); }
 #define debug(arg) { debug_print(__FILE__, __LINE__, __FUNCTION__, "", arg, 0, 's'); }
 #define debug_s(arg) { debug_print(__FILE__, __LINE__, __FUNCTION__, "", arg, 0, 's'); }
 
@@ -19,6 +20,7 @@ void debug_print(const char* file, int line, const char* fun, const char* arg_na
 #define debug_s(arg) ;
 #define debug_d(arg) ;
 #define debug(arg) ;
+#define dd(arg) ;
 #define NDEBUG
 
 #endif
@@ -68,8 +70,12 @@ extern int my_block_col_no;
 
 extern MPI_Comm mpi_inner_group_comm;
 extern int my_block_row_no;
+extern int my_big_block_row_no;
 extern void inner_replicate_sparse(Sparse* my_sparse);
-extern int mpi_inner_no(int);
+extern int inner_row_no(int);
+extern int to_rank(int row, int col);
+extern int pc2;
+extern bool my_inner_row(int row);
 
 //----------------------
 //---- column

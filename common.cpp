@@ -13,6 +13,7 @@ int &row_no_max = mpi_meta_init.row_no_max;
 int &nnz_max = mpi_meta_init.nnz_max;
 int repl_fact = 1;
 bool inner_coordinator = false;
+int pc2;
 
 
 
@@ -23,6 +24,7 @@ int my_block_col_no = -1;
 
 MPI_Comm mpi_inner_group_comm;
 int my_block_row_no = -1;
+int my_big_block_row_no = -1;
 
 //----------------------
 //---- column
@@ -41,8 +43,13 @@ void compute_metadata(){
   min_block_size = side / block_count;
   max_block_size = (bigger_blocks_count > 0) + min_block_size;
   if(use_inner){
+    pc2 = num_processes / repl_fact / repl_fact;
     my_block_col_no = mpi_rank % block_count;
+    my_big_block_row_no = mpi_rank / block_count / repl_fact;
     my_block_row_no = mpi_rank / block_count;
+    assert(my_big_block_row_no < pc2);
+    assert(my_block_row_no < block_count);
+    assert(my_block_col_no < block_count);
   } else {
     my_block_col_no = mpi_rank;
   }
@@ -53,7 +60,7 @@ void broadcast_metadata(){
 }
 
 void inner_replicate_sparse(Sparse* my_sparse){
-  MPI_Comm_split(MPI_COMM_WORLD, my_block_row_no, my_block_col_no, &mpi_inner_group_comm);
+  MPI_Comm_split(MPI_COMM_WORLD, my_block_row_no , my_block_col_no, &mpi_inner_group_comm);
   int csr_size = (my_block_col_no == 0)
     ? my_sparse->csr_size()
     : Sparse::csr_alloc_size(row_no_max, nnz_max);
@@ -64,12 +71,25 @@ void inner_replicate_sparse(Sparse* my_sparse){
 int mpi_no(int x){
   return (num_processes + mpi_rank + x) % num_processes;
 }
-int mpi_inner_no(int x){
-  int pc2 = num_processes / repl_fact / repl_fact; //p/(c^2)
+
+int inner_row_no(int x){
+  if(x==0){
+    assert((my_block_row_no % pc2) == (my_block_col_no % pc2));
+  } else {
+    assert(my_inner_row(x + my_block_row_no));
+  }
   int anti_group_row = (x + pc2) % pc2;
-  int row = (my_block_row_no + anti_group_row + block_count) % block_count;
-  return row * block_count + my_block_col_no;
+  return (my_block_row_no + anti_group_row + block_count) % block_count;
 }
+
+int to_rank(int row, int col){ return row * block_count + col ; }
+
+bool my_inner_row(int row){
+  return (row - inner_row_no(0) + block_count) % block_count < pc2;
+}
+
+
+
 
 int MPI_Wait(MPI_Request* request){
   return MPI_Wait(request, MPI_STATUS_IGNORE);
@@ -117,7 +137,8 @@ void debug_print(const char* file, int line, const char* fun, const char* arg_na
     sprintf(printer, "---------  %s  --------", s_arg);
   else
     sprintf(printer, "%d", d_arg);
-  fprintf(stderr, "[r%d,c%d]  %s:%d in %s()  | %s=%s \n",
+  fprintf(stderr, "(%d)[r%d,c%d]  %s:%d in %s()  | %s=%s \n",
+      mpi_rank,
       my_block_row_no,
       my_block_col_no,
       file,
